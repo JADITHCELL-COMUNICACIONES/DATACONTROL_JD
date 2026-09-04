@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.5"
+VERSION_ACTUAL = "1.4.7"
 
 # --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
 def obtener_tiempo_colombia():
