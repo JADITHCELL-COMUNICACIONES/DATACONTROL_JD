@@ -18,7 +18,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.3"
+VERSION_ACTUAL = "1.4.4"
+
+# --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
+def obtener_tiempo_colombia():
+    # El servidor en la nube está en UTC, restamos 5 horas para ajustar a Colombia
+    return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
 # --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO (BOTONES SIEMPRE VISIBLES) ---
 st.markdown("""
@@ -80,7 +85,6 @@ st.markdown("""
         border-top: 1px solid #1f293d;
         z-index: 999;
     }
-    /* FORZAR QUE TODOS LOS BOTONES SE VEAN CLARAMENTE SIN NECESIDAD DE PASAR EL MOUSE */
     div.stButton > button {
         background-color: #1f293d !important;
         color: #ffffff !important;
@@ -405,12 +409,12 @@ with tabs[0]:
                 try:
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
-                    fecha_ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
 
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
                         cursor.execute("INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (itm['codigo'], item['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
+                                       (itm['codigo'], itm['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
                     conn.commit()
                     conn.close()
 
@@ -438,7 +442,7 @@ with tabs[0]:
 
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("📊 Cierre de Caja", use_container_width=True, key="v_btn_cierre_caja"):
-            hoy = datetime.datetime.now().strftime("%Y-%m-%d")
+            hoy = obtener_tiempo_colombia().strftime("%Y-%m-%d")
             conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
             cursor = conn.cursor()
             cursor.execute("SELECT SUM(total) FROM ventas WHERE fecha LIKE ?", (hoy + '%',))
@@ -452,13 +456,12 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (Con actualización de fecha/hora exacta al segundo al hacer clic en imprimir)
+    # VISTA PREVIA Y IMPRESIÓN (Con hora exacta de Colombia sincronizada)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
         with st.expander("🧾 VISTA PREVIA TICKET POS DE VENTA (80MM)", expanded=True):
-            # Usamos la hora actual exacta al desplegar la vista previa
-            fecha_actual_ticket = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            fecha_actual_ticket = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             
             lineas_ticket = [
                 f"{cfg['empresa']}",
@@ -498,8 +501,7 @@ with tabs[0]:
             col_pr1, col_pr2 = st.columns(2)
             with col_pr1:
                 if st.button("🖨️ Imprimir Ticket POS", use_container_width=True, key="btn_imprimir_recibo_venta_directo"):
-                    # Forzar la hora exacta en el HTML de impresión al momento de tocar el botón
-                    fecha_impresion_real = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    fecha_impresion_real = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     ticket_impresion_final = ticket_limpio.replace(fecha_actual_ticket, fecha_impresion_real)
                     
                     logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
@@ -841,7 +843,7 @@ if cfg['modo_taller'] == 1:
                 if ot_cliente and ot_equipo and ot_falla:
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
-                    fecha_ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                    (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, ot_costo, ot_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora))
@@ -865,7 +867,7 @@ if cfg['modo_taller'] == 1:
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
-            fecha_taller_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             saldo_r = rt['costo'] - rt['abono']
 
             with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d}", expanded=True):
@@ -1083,7 +1085,7 @@ with tabs[-1]:
     with col_resp1:
         if st.button("💾 Crear Respaldo Manual Ahora", use_container_width=True):
             os.makedirs("backups", exist_ok=True)
-            fecha_b = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            fecha_b = obtener_tiempo_colombia().strftime("%Y%m%d_%H%M%S")
             backup_name = os.path.join("backups", f"backup_jadithcell_{fecha_b}.db")
             try:
                 shutil.copyfile("jadithcell_comunicaciones.db", backup_name)
