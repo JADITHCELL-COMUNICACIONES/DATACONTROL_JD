@@ -92,7 +92,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SISTEMA DE AUTENTICACIÓN (LOGIN SEGURO) ---
+# --- SISTEMA DE AUTENTICACIÓN Y SESIÓN PERSISTENTE ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
 
@@ -112,6 +112,13 @@ if not st.session_state.autenticado:
                 st.error("Usuario o contraseña incorrectos.")
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
+else:
+    # Botón en la barra lateral para cerrar sesión voluntariamente cuando lo necesites
+    with st.sidebar:
+        st.markdown("### ⚙️ Control de Sesión")
+        if st.button("🚪 Cerrar Sesión"):
+            st.session_state.autenticado = False
+            st.rerun()
 
 # --- INICIALIZACIÓN Y MIGRACIÓN SEGURA DE BD ---
 def inicializar_bd():
@@ -440,7 +447,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y BOTÓN DE IMPRESIÓN CON LOGOTIPO CENTRADO
+    # VISTA PREVIA Y IMPRESIÓN
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
         with st.expander("🧾 VISTA PREVIA TICKET POS DE VENTA (80MM)", expanded=True):
@@ -823,7 +830,7 @@ if cfg['modo_taller'] == 1:
                     cursor = conn.cursor()
                     fecha_ahora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha)
-                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                    (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, ot_costo, ot_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora))
                     conn.commit()
                     
@@ -860,7 +867,7 @@ if cfg['modo_taller'] == 1:
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
- ORDEN DE SERVICIO N°: {rt['id']:04d}
+ ORDERN DE SERVICIO N°: {rt['id']:04d}
  FECHA: {rt['fecha']}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
