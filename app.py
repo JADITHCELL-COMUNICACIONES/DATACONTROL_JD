@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.1"
+VERSION_ACTUAL = "1.4.2"
 
 # --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO ---
 st.markdown("""
@@ -113,7 +113,6 @@ if not st.session_state.autenticado:
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 else:
-    # Botón en la barra lateral para cerrar sesión voluntariamente cuando lo necesites
     with st.sidebar:
         st.markdown("### ⚙️ Control de Sesión")
         if st.button("🚪 Cerrar Sesión"):
@@ -447,9 +446,12 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN
+    # VISTA PREVIA Y IMPRESIÓN (Con actualización automática de fecha/hora en tiempo real)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
+        # FECHA Y HORA FRESCA AL MOMENTO DE VER O IMPRIMIR EL TICKET
+        rg['fecha'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         with st.expander("🧾 VISTA PREVIA TICKET POS DE VENTA (80MM)", expanded=True):
             lineas_ticket = [
                 f"{cfg['empresa']}",
@@ -852,7 +854,10 @@ if cfg['modo_taller'] == 1:
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
+            # FECHA Y HORA FRESCA PARA EL RECIBO DE TALLER EN TIEMPO REAL
+            rt['fecha'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             saldo_r = rt['costo'] - rt['abono']
+
             with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d}", expanded=True):
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
                     col_tr1, col_tr2, col_tr3 = st.columns([2, 1, 2])
@@ -867,7 +872,7 @@ if cfg['modo_taller'] == 1:
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
- ORDERN DE SERVICIO N°: {rt['id']:04d}
+ ORDEN DE SERVICIO N°: {rt['id']:04d}
  FECHA: {rt['fecha']}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
