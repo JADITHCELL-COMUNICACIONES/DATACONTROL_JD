@@ -18,14 +18,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.4"
+VERSION_ACTUAL = "1.4.5"
 
 # --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
 def obtener_tiempo_colombia():
-    # El servidor en la nube está en UTC, restamos 5 horas para ajustar a Colombia
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
-# --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO (BOTONES SIEMPRE VISIBLES) ---
+# --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO ---
 st.markdown("""
     <style>
     .stApp {
@@ -358,12 +357,23 @@ with tabs[0]:
             df_carrito = pd.DataFrame(filas_tabla)
             st.dataframe(df_carrito, use_container_width=True, hide_index=True)
 
-            col_q1, col_q2 = st.columns([1, 3])
+            col_q1, col_q2, col_q3 = st.columns([1.2, 1.8, 2.5])
             with col_q1:
-                item_a_quitar = st.number_input("Fila # a quitar", min_value=1, max_value=len(st.session_state.carrito), value=1, step=1, key="v_fila_quitar")
+                item_a_quitar = st.number_input("Fila #", min_value=1, max_value=len(st.session_state.carrito), value=1, step=1, key="v_fila_quitar")
             with col_q2:
                 st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-                if st.button("❌ Quitar Ítem Seleccionado", key="v_btn_del_item"):
+                if st.button("➖ Restar 1 Cantidad", key="v_btn_restar_1"):
+                    idx = item_a_quitar - 1
+                    if st.session_state.carrito[idx]['cantidad'] > 1:
+                        st.session_state.carrito[idx]['cantidad'] -= 1
+                        st.session_state.carrito[idx]['total'] = st.session_state.carrito[idx]['cantidad'] * st.session_state.carrito[idx]['precio']
+                    else:
+                        st.session_state.carrito.pop(idx)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col_q3:
+                st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
+                if st.button("❌ Quitar Ítem Completo", key="v_btn_del_item"):
                     st.session_state.carrito.pop(item_a_quitar - 1)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -456,7 +466,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (Con hora exacta de Colombia sincronizada)
+    # VISTA PREVIA Y IMPRESIÓN
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
