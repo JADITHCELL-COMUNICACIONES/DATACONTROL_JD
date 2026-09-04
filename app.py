@@ -18,9 +18,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.2"
+VERSION_ACTUAL = "1.4.3"
 
-# --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO ---
+# --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO (BOTONES SIEMPRE VISIBLES) ---
 st.markdown("""
     <style>
     .stApp {
@@ -80,14 +80,20 @@ st.markdown("""
         border-top: 1px solid #1f293d;
         z-index: 999;
     }
+    /* FORZAR QUE TODOS LOS BOTONES SE VEAN CLARAMENTE SIN NECESIDAD DE PASAR EL MOUSE */
+    div.stButton > button {
+        background-color: #1f293d !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border: 1px solid #38bdf8 !important;
+        border-radius: 6px !important;
+    }
     div.stButton > button[kind="primary"] {
         background-color: #dc2626 !important;
         color: white !important;
-        font-weight: bold !important;
         font-size: 18px !important;
         height: 52px !important;
         border: none !important;
-        border-radius: 6px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -404,7 +410,7 @@ with tabs[0]:
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
                         cursor.execute("INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (itm['codigo'], itm['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
+                                       (itm['codigo'], item['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
                     conn.commit()
                     conn.close()
 
@@ -446,20 +452,21 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (Con actualización automática de fecha/hora en tiempo real)
+    # VISTA PREVIA Y IMPRESIÓN (Con actualización de fecha/hora exacta al segundo al hacer clic en imprimir)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
-        # FECHA Y HORA FRESCA AL MOMENTO DE VER O IMPRIMIR EL TICKET
-        rg['fecha'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         with st.expander("🧾 VISTA PREVIA TICKET POS DE VENTA (80MM)", expanded=True):
+            # Usamos la hora actual exacta al desplegar la vista previa
+            fecha_actual_ticket = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
             lineas_ticket = [
                 f"{cfg['empresa']}",
                 f"{cfg['propietario']}",
                 f"NIT: {cfg['nit']} | Tel: {cfg['telefono']}",
                 f"{cfg['direccion']}",
                 "-" * 38,
-                f"FECHA: {rg['fecha']}",
+                f"FECHA: {fecha_actual_ticket}",
                 f"CLIENTE: {rg['cliente']} (CC: {rg['cedula']})",
                 "-" * 38,
                 f"{'Cant':<5}{'Producto':<21}{'Total':>12}",
@@ -491,13 +498,17 @@ with tabs[0]:
             col_pr1, col_pr2 = st.columns(2)
             with col_pr1:
                 if st.button("🖨️ Imprimir Ticket POS", use_container_width=True, key="btn_imprimir_recibo_venta_directo"):
+                    # Forzar la hora exacta en el HTML de impresión al momento de tocar el botón
+                    fecha_impresion_real = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    ticket_impresion_final = ticket_limpio.replace(fecha_actual_ticket, fecha_impresion_real)
+                    
                     logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
                     components.html(f"""
                         <html>
                         <body onload="window.print()">
                             <div style="font-family: monospace; font-size: 12px; white-space: pre-wrap; text-align: center;">
                                 {logo_html}
-                                {ticket_limpio}
+                                {ticket_impresion_final}
                             </div>
                         </body>
                         </html>
@@ -854,8 +865,7 @@ if cfg['modo_taller'] == 1:
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
-            # FECHA Y HORA FRESCA PARA EL RECIBO DE TALLER EN TIEMPO REAL
-            rt['fecha'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            fecha_taller_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             saldo_r = rt['costo'] - rt['abono']
 
             with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d}", expanded=True):
@@ -873,7 +883,7 @@ if cfg['modo_taller'] == 1:
         Cel: {cfg['telefono']}
 ==========================================
  ORDEN DE SERVICIO N°: {rt['id']:04d}
- FECHA: {rt['fecha']}
+ FECHA: {fecha_taller_actual}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
  CÉDULA:  {rt['cedula']} | TEL: {rt['telefono']}
