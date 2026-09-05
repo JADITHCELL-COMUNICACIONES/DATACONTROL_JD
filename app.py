@@ -4,11 +4,26 @@ import datetime
 import os
 import csv
 import re
+from pathlib import Path
 import pandas as pd
 from urllib.parse import quote
 import streamlit.components.v1 as components
 import shutil
 import base64
+from PIL import Image, ImageDraw, ImageFont
+
+
+# Crear automaticamente el componente si se distribuye solo app.py.
+_COMPONENT_DIR = Path(__file__).resolve().parent / "pattern_drawer"
+_COMPONENT_FILE = _COMPONENT_DIR / "index.html"
+_COMPONENT_HTML_B64 = "PCFkb2N0eXBlIGh0bWw+CjxodG1sIGxhbmc9ImVzIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0idXRmLTgiIC8+CiAgPHN0eWxlPgogICAgaHRtbCwgYm9keSB7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgYmFja2dyb3VuZDogdHJhbnNwYXJlbnQ7IH0KICAgICNjYW52YXMgeyBkaXNwbGF5OiBibG9jazsgd2lkdGg6IDIyMHB4OyBoZWlnaHQ6IDIwMHB4OyBiYWNrZ3JvdW5kOiAjMGYxNzJhOyBib3JkZXI6IDA7IGN1cnNvcjogY3Jvc3NoYWlyOyB0b3VjaC1hY3Rpb246IG5vbmU7IH0KICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogIDxjYW52YXMgaWQ9ImNhbnZhcyIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIyMDAiPjwvY2FudmFzPgogIDxzY3JpcHQ+CiAgICAvLyBJbXBsZW1lbnRhY2nDs24gbcOtbmltYSBkZWwgcHJvdG9jb2xvIG9maWNpYWwgZGUgU3RyZWFtbGl0IENvbXBvbmVudHMuCiAgICBjb25zdCBSRUFEWSA9ICdzdHJlYW1saXQ6Y29tcG9uZW50UmVhZHknOwogICAgY29uc3QgUkVOREVSID0gJ3N0cmVhbWxpdDpyZW5kZXInOwogICAgY29uc3QgVkFMVUUgPSAnc3RyZWFtbGl0OnNldENvbXBvbmVudFZhbHVlJzsKICAgIGNvbnN0IEhFSUdIVCA9ICdzdHJlYW1saXQ6c2V0RnJhbWVIZWlnaHQnOwogICAgY29uc3QgY2FudmFzID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhbnZhcycpOwogICAgY29uc3QgY3R4ID0gY2FudmFzLmdldENvbnRleHQoJzJkJyk7CiAgICBjb25zdCBub2RlcyA9IFsKICAgICAge2lkOicxJyx4OjQwLHk6NDB9LHtpZDonMicseDoxMTAseTo0MH0se2lkOiczJyx4OjE4MCx5OjQwfSwKICAgICAge2lkOic0Jyx4OjQwLHk6MTAwfSx7aWQ6JzUnLHg6MTEwLHk6MTAwfSx7aWQ6JzYnLHg6MTgwLHk6MTAwfSwKICAgICAge2lkOic3Jyx4OjQwLHk6MTYwfSx7aWQ6JzgnLHg6MTEwLHk6MTYwfSx7aWQ6JzknLHg6MTgwLHk6MTYwfQogICAgXTsKICAgIGxldCBzZXF1ZW5jZSA9IFtdOwogICAgbGV0IGRyYXdpbmcgPSBmYWxzZTsKCiAgICBmdW5jdGlvbiBzZW5kKHR5cGUsIGRhdGEpIHsKICAgICAgd2luZG93LnBhcmVudC5wb3N0TWVzc2FnZShPYmplY3QuYXNzaWduKHtpc1N0cmVhbWxpdE1lc3NhZ2U6dHJ1ZSwgdHlwZTp0eXBlfSwgZGF0YSB8fCB7fSksICcqJyk7CiAgICB9CiAgICBmdW5jdGlvbiBzZXRWYWx1ZSgpIHsgc2VuZChWQUxVRSwge3ZhbHVlOnNlcXVlbmNlLmpvaW4oJycpLCBkYXRhVHlwZTonanNvbid9KTsgfQogICAgZnVuY3Rpb24gZHJhdygpIHsKICAgICAgY3R4LmNsZWFyUmVjdCgwLDAsY2FudmFzLndpZHRoLGNhbnZhcy5oZWlnaHQpOwogICAgICBpZiAoc2VxdWVuY2UubGVuZ3RoID4gMSkgewogICAgICAgIGNvbnN0IGNvb3JkcyA9IHNlcXVlbmNlLm1hcChpZCA9PiBub2Rlcy5maW5kKG4gPT4gbi5pZCA9PT0gaWQpKTsKICAgICAgICBjdHguYmVnaW5QYXRoKCk7IGN0eC5tb3ZlVG8oY29vcmRzWzBdLngsIGNvb3Jkc1swXS55KTsKICAgICAgICBjb29yZHMuc2xpY2UoMSkuZm9yRWFjaChuID0+IGN0eC5saW5lVG8obi54LG4ueSkpOwogICAgICAgIGN0eC5zdHJva2VTdHlsZT0nIzAyODRjNyc7IGN0eC5saW5lV2lkdGg9NTsgY3R4LmxpbmVDYXA9J3JvdW5kJzsgY3R4LmxpbmVKb2luPSdyb3VuZCc7IGN0eC5zdHJva2UoKTsKICAgICAgICBjdHguc3Ryb2tlU3R5bGU9JyMzOGJkZjgnOyBjdHgubGluZVdpZHRoPTIuNTsgY3R4LnN0cm9rZSgpOwogICAgICB9CiAgICAgIG5vZGVzLmZvckVhY2gobiA9PiB7CiAgICAgICAgY29uc3QgYWN0aXZlID0gc2VxdWVuY2UuaW5jbHVkZXMobi5pZCk7CiAgICAgICAgaWYgKGFjdGl2ZSkgeyBjdHguYmVnaW5QYXRoKCk7IGN0eC5hcmMobi54LG4ueSwxOCwwLE1hdGguUEkqMik7IGN0eC5zdHJva2VTdHlsZT0nIzM4YmRmOCc7IGN0eC5saW5lV2lkdGg9MjsgY3R4LnN0cm9rZSgpOyB9CiAgICAgICAgY3R4LmJlZ2luUGF0aCgpOyBjdHguYXJjKG4ueCxuLnksYWN0aXZlPzE0OjksMCxNYXRoLlBJKjIpOwogICAgICAgIGN0eC5maWxsU3R5bGU9YWN0aXZlPycjMjJjNTVlJzonIzFlMjkzYic7IGN0eC5maWxsKCk7IGN0eC5zdHJva2VTdHlsZT0nIzM4YmRmOCc7IGN0eC5saW5lV2lkdGg9MjsgY3R4LnN0cm9rZSgpOwogICAgICAgIGN0eC5maWxsU3R5bGU9YWN0aXZlPyd3aGl0ZSc6JyM5NGEzYjgnOyBjdHguZm9udD0nYm9sZCAxMHB4IEFyaWFsJzsgY3R4LnRleHRBbGlnbj0nY2VudGVyJzsgY3R4LnRleHRCYXNlbGluZT0nbWlkZGxlJzsgY3R4LmZpbGxUZXh0KG4uaWQsbi54LG4ueSk7CiAgICAgIH0pOwogICAgfQogICAgZnVuY3Rpb24gZmluZFBvaW50KGUpIHsKICAgICAgY29uc3Qgcj1jYW52YXMuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7CiAgICAgIGNvbnN0IHg9KGUuY2xpZW50WC1yLmxlZnQpKmNhbnZhcy53aWR0aC9yLndpZHRoLCB5PShlLmNsaWVudFktci50b3ApKmNhbnZhcy5oZWlnaHQvci5oZWlnaHQ7CiAgICAgIHJldHVybiBub2Rlcy5maW5kKG4gPT4gTWF0aC5hYnMoeC1uLngpPDI1ICYmIE1hdGguYWJzKHktbi55KTwyNSk7CiAgICB9CiAgICBjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcmRvd24nLCBlID0+IHsKICAgICAgZS5wcmV2ZW50RGVmYXVsdCgpOyBkcmF3aW5nPXRydWU7IHNlcXVlbmNlPVtdOyBjb25zdCBuPWZpbmRQb2ludChlKTsgaWYobikgc2VxdWVuY2UucHVzaChuLmlkKTsgZHJhdygpOyBzZXRWYWx1ZSgpOwogICAgfSk7CiAgICBjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcm1vdmUnLCBlID0+IHsKICAgICAgaWYoIWRyYXdpbmcpIHJldHVybjsgZS5wcmV2ZW50RGVmYXVsdCgpOyBjb25zdCBuPWZpbmRQb2ludChlKTsKICAgICAgaWYobiAmJiAhc2VxdWVuY2UuaW5jbHVkZXMobi5pZCkpIHsgc2VxdWVuY2UucHVzaChuLmlkKTsgZHJhdygpOyBzZXRWYWx1ZSgpOyB9CiAgICB9KTsKICAgIHdpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdwb2ludGVydXAnLCAoKSA9PiB7IGlmKGRyYXdpbmcpeyBkcmF3aW5nPWZhbHNlOyBzZXRWYWx1ZSgpOyB9IH0pOwogICAgd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ21lc3NhZ2UnLCBlID0+IHsKICAgICAgaWYoZS5kYXRhICYmIGUuZGF0YS50eXBlPT09UkVOREVSKSB7CiAgICAgICAgY29uc3QgaW5jb21pbmc9U3RyaW5nKChlLmRhdGEuYXJnc3x8e30pLnNlcXVlbmNlfHwnJykucmVwbGFjZSgvW14xLTldL2csJycpOwogICAgICAgIGlmKCFkcmF3aW5nKSBzZXF1ZW5jZT1pbmNvbWluZy5zcGxpdCgnJyk7IGRyYXcoKTsKICAgICAgfQogICAgfSk7CiAgICBzZW5kKFJFQURZLCB7YXBpVmVyc2lvbjoxfSk7CiAgICBzZW5kKEhFSUdIVCwge2hlaWdodDoyMDV9KTsKICAgIGRyYXcoKTsKICA8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+Cg=="
+_COMPONENT_DIR.mkdir(parents=True, exist_ok=True)
+_COMPONENT_FILE.write_bytes(base64.b64decode(_COMPONENT_HTML_B64))
+
+pattern_drawer_component = components.declare_component(
+    "pattern_drawer",
+    path=str(Path(__file__).resolve().parent / "pattern_drawer")
+)
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -18,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.4.7"
+VERSION_ACTUAL = "1.6.5"
 
 # --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
 def obtener_tiempo_colombia():
@@ -49,13 +64,7 @@ st.markdown("""
         color: #facc15;
         font-weight: bold;
         font-size: 13px;
-        margin-bottom: 2px;
-    }
-    .lbl-celeste {
-        color: #38bdf8;
-        font-weight: bold;
-        font-size: 13px;
-        margin-bottom: 2px;
+        margin-bottom: 8px;
     }
     .val-subtotal {
         font-family: 'Consolas', monospace;
@@ -92,10 +101,10 @@ st.markdown("""
         border-radius: 6px !important;
     }
     div.stButton > button[kind="primary"] {
-        background-color: #dc2626 !important;
+        background-color: #16a34a !important;
         color: white !important;
-        font-size: 18px !important;
-        height: 52px !important;
+        font-size: 16px !important;
+        height: 45px !important;
         border: none !important;
     }
     </style>
@@ -246,6 +255,7 @@ if 'recibo_generado' not in st.session_state: st.session_state.recibo_generado =
 if 'recibo_taller' not in st.session_state: st.session_state.recibo_taller = None
 if 'ficha_orden_id' not in st.session_state: st.session_state.ficha_orden_id = None
 if 'patron_secuencia' not in st.session_state: st.session_state.patron_secuencia = ""
+if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
 st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
@@ -703,177 +713,131 @@ if cfg['modo_taller'] == 1:
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
         st.subheader("🛠️ Órdenes de Servicio y Ficha Técnica")
         
+        # Lienzo interactivo real: devuelve la secuencia dibujada a Python.
         def renderizar_lienzo_patron(secuencia_actual):
-            html_patron = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-                body { background-color: #0b132b; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-                canvas { background-color: #0b132b; border: 2px solid #1f293d; border-radius: 8px; cursor: crosshair; }
-            </style>
-            </head>
-            <body>
-            <canvas id="patternCanvas" width="240" height="240"></canvas>
-            <script>
-                const canvas = document.getElementById('patternCanvas');
-                const ctx = canvas.getContext('2d');
-                
-                const nodes = [
-                    {id: '1', x: 50, y: 50},
-                    {id: '2', x: 120, y: 50},
-                    {id: '3', x: 190, y: 50},
-                    {id: '4', x: 50, y: 120},
-                    {id: '5', x: 120, y: 120},
-                    {id: '6', x: 190, y: 120},
-                    {id: '7', x: 50, y: 190},
-                    {id: '8', x: 120, y: 190},
-                    {id: '9', x: 190, y: 190}
-                ];
-                
-                let sequence = "SEC_VAL".split('').filter(n => n >= '1' && n <= '9');
-                let isDrawing = false;
-                
-                function draw() {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    
-                    if (sequence.length > 1) {
-                        ctx.beginPath();
-                        ctx.strokeStyle = '#38bdf8';
-                        ctx.lineWidth = 5;
-                        ctx.lineCap = 'round';
-                        for (let i = 0; i < sequence.length; i++) {
-                            const node = nodes.find(n => n.id === sequence[i]);
-                            if (i === 0) ctx.moveTo(node.x, node.y);
-                            else ctx.lineTo(node.x, node.y);
-                        }
-                        ctx.stroke();
-                    }
-                    
-                    nodes.forEach(node => {
-                        const active = sequence.includes(node.id);
-                        ctx.beginPath();
-                        ctx.arc(node.x, node.y, 18, 0, 2 * Math.PI);
-                        ctx.fillStyle = active ? '#38bdf8' : '#162032';
-                        ctx.fill();
-                        ctx.lineWidth = 3;
-                        ctx.strokeStyle = active ? '#ffffff' : '#475569';
-                        ctx.stroke();
-                        
-                        ctx.fillStyle = active ? '#000000' : '#94a3b8';
-                        ctx.font = 'bold 14px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(node.id, node.x, node.y);
-                    });
-                }
-                
-                function getNodeAtPos(x, y) {
-                    for (let node of nodes) {
-                        let dx = node.x - x;
-                        let dy = node.y - y;
-                        if (Math.sqrt(dx * dx + dy * dy) < 22) {
-                            return node.id;
-                        }
-                    }
-                    return null;
-                }
-                
-                canvas.addEventListener('mousedown', (e) => {
-                    isDrawing = true;
-                    sequence = [];
-                    const rect = canvas.getBoundingClientRect();
-                    const id = getNodeAtPos(e.clientX - rect.left, e.clientY - rect.top);
-                    if (id && !sequence.includes(id)) sequence.push(id);
-                    draw();
-                });
-                
-                canvas.addEventListener('mousemove', (e) => {
-                    if (!isDrawing) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const id = getNodeAtPos(e.clientX - rect.left, e.clientY - rect.top);
-                    if (id && !sequence.includes(id)) {
-                        sequence.push(id);
-                        draw();
-                        window.parent.postMessage({type: 'streamlit:setComponentValue', value: sequence.join('')}, '*');
-                    }
-                });
-                
-                window.addEventListener('mouseup', () => {
-                    if (isDrawing) {
-                        isDrawing = false;
-                        window.parent.postMessage({type: 'streamlit:setComponentValue', value: sequence.join('')}, '*');
-                    }
-                });
-                
-                draw();
-            </script>
-            </body>
-            </html>
-            """
-            html_final = html_patron.replace("SEC_VAL", str(secuencia_actual))
-            return components.html(html_final, height=255, scrolling=False)
+            secuencia_inicial = "".join(
+                c for c in str(secuencia_actual or "") if c in "123456789"
+            )
+            secuencia = pattern_drawer_component(
+                sequence=secuencia_inicial,
+                key=f"pattern_drawer_{st.session_state.form_counter}"
+            )
+            if secuencia is None:
+                secuencia = secuencia_inicial
+            secuencia = "".join(c for c in str(secuencia) if c in "123456789")
+            st.session_state.patron_secuencia = secuencia
+            st.caption(f"Secuencia actual: {secuencia or '—'}")
+            return secuencia
 
-        with st.expander("📋 REGISTRAR ORDEN DE SERVICIO", expanded=False):
-            t_col1, t_col2, t_col3 = st.columns(3)
-            with t_col1:
-                ot_cliente = st.text_input("Nombre del cliente *", key="t_cli")
-                ot_cedula = st.text_input("Cédula / NIT", key="t_ced")
-                ot_tel = st.text_input("Teléfono *", key="t_tel")
-                ot_dir = st.text_input("Dirección", key="t_dir")
-            with t_col2:
-                ot_equipo = st.text_input("Modelo del equipo *", key="t_eq")
-                ot_imei = st.text_input("IMEI / Serial", key="t_im")
-                ot_falla = st.text_input("Falla reportada *", key="t_fa")
-            with t_col3:
-                ot_costo = st.number_input("Costo Total ($)", min_value=0.0, value=0.0, key="t_cos")
-                ot_abono = st.number_input("Abono Inicial ($)", min_value=0.0, value=0.0, key="t_abo")
-                ot_patron_txt = st.text_input("Secuencia del Patrón", placeholder="Ej: 7415369", key="t_pat")
+        fc = st.session_state.form_counter
 
-            st.markdown("##### 🔐 Dibujar Patrón de Desbloqueo (Mantén presionado y desliza el mouse sobre los puntos)")
+        with st.expander("📋 REGISTRAR ORDEN DE SERVICIO - JADITHCELL COMUNICACIONES", expanded=True):
+            col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
             
-            col_pat_izq, col_pat_der = st.columns([1, 1])
-            with col_pat_izq:
-                secuencia_dibujada = st.session_state.patron_secuencia
-                renderizar_lienzo_patron(secuencia_dibujada)
+            with col_b1:
+                st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
+                ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
+                ot_cedula = st.text_input("Cédula / NIT", placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
+                ot_tel = st.text_input("Teléfono *", placeholder="* Teléfono", key=f"t_tel_{fc}")
+                ot_dir = st.text_input("Dirección", placeholder="Dirección", key=f"t_dir_{fc}")
+
+            with col_b2:
+                st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
+                ot_falla = st.text_input("Falla reportada *", placeholder="* Falla reportada", key=f"t_fa_{fc}")
+                ot_equipo = st.text_input("Modelo del equipo *", placeholder="* Modelo del equipo", key=f"t_eq_{fc}")
+                ot_imei = st.text_input("IMEI / Serial", placeholder="IMEI / Serial", key=f"t_im_{fc}")
+                st.markdown("<br>", unsafe_allow_html=True)
+
+            with col_b3:
+                st.markdown('<div class="lbl-amarillo">COSTOS Y SEGURIDAD</div>', unsafe_allow_html=True)
+                sub_c1, sub_c2 = st.columns(2)
+                with sub_c1:
+                    ot_costo_str = st.text_input("Precio", placeholder="Precio", key=f"t_cos_{fc}")
+                with sub_c2:
+                    ot_abono_str = st.text_input("Abono", placeholder="Abono", key=f"t_abo_{fc}")
                 
-                if st.button("🧹 Limpiar Patrón", key="btn_limpiar_pat"):
+                ot_patron_txt = st.text_input("Patrón, PIN o Contraseña", placeholder="Patrón, PIN o Contraseña", key=f"t_pat_{fc}")
+
+            # Esta sección queda fuera de las tres columnas para que el lienzo
+            # siempre sea visible durante el registro de una nueva orden.
+            st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+            st.markdown("<div class='lbl-celeste'>🔐 Dibujar Patrón de Desbloqueo (Opcional)</div>", unsafe_allow_html=True)
+            st.caption("Mantenga presionado el botón del mouse o el dedo y arrástrelo por los puntos en orden.")
+            patron_col_1, patron_col_2 = st.columns([3, 1])
+            with patron_col_1:
+                val_lienzo_canvas = renderizar_lienzo_patron(st.session_state.patron_secuencia)
+                if val_lienzo_canvas and isinstance(val_lienzo_canvas, str):
+                    st.session_state.patron_secuencia = val_lienzo_canvas
+            with patron_col_2:
+                if st.button("🧹 Limpiar Patrón", key=f"btn_limpiar_pat_{fc}", use_container_width=True):
                     st.session_state.patron_secuencia = ""
                     st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            with col_pat_der:
-                sec_final = ot_patron_txt if ot_patron_txt else st.session_state.patron_secuencia
-                st.markdown(f"**Secuencia registrada:** `{sec_final}`")
-                st.info("💡 Consejo: También puedes escribir directamente la secuencia numérica en la casilla de arriba.")
+            ot_notas = st.text_input("Notas adicionales / Chequeo físico", placeholder="Notas adicionales / Chequeo físico", key=f"t_not_{fc}")
 
-            ot_notas = st.text_input("Notas adicionales / Chequeo físico", key="t_not")
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_btn_reg1, col_btn_reg2 = st.columns([4, 1])
+            with col_btn_reg1:
+                if st.button("💾 Guardar Orden", type="primary", use_container_width=True, key=f"t_btn_save_{fc}"):
+                    # PRIORIDAD ABSOLUTA: Si escribiste en la casilla de texto se usa eso, de lo contrario se toma lo que se dibujó en el canvas
+                    patron_guardar = ot_patron_txt.strip() if ot_patron_txt else st.session_state.patron_secuencia.strip()
+                    
+                    def limpiar_monto(val_txt):
+                        if not val_txt: return 0.0
+                        try:
+                            limpio = str(val_txt).replace('$', '').strip()
+                            if '.' in limpio and ',' in limpio:
+                                limpio = limpio.replace('.', '').replace(',', '.')
+                            elif limpio.count('.') > 1:
+                                limpio = limpio.replace('.', '', limpio.count('.') - 1)
+                            elif ',' in limpio and '.' not in limpio:
+                                limpio = limpio.replace(',', '.')
+                            return float(limpio)
+                        except:
+                            return 0.0
+
+                    val_costo = limpiar_monto(ot_costo_str)
+                    val_abono = limpiar_monto(ot_abono_str)
+
+                    if ot_cliente and ot_equipo and ot_falla:
+                        conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+                        cursor = conn.cursor()
+                        fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                        cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                       (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora))
+                        conn.commit()
+                        
+                        cursor.execute("SELECT last_insert_rowid()")
+                        nueva_id = cursor.fetchone()[0]
+                        conn.close()
+
+                        st.success("¡Orden de servicio guardada con éxito!")
+                        
+                        st.session_state.patron_secuencia = ""
+                        st.session_state.form_counter += 1
+                        
+                        st.session_state.recibo_taller = {
+                            "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
+                            "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
+                            "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
+                            "chequeo": ot_notas, "fecha": fecha_ahora
+                        }
+                        st.rerun()
+                    else:
+                        st.error("Cliente, modelo del equipo y falla son requeridos.")
             
-            if st.button("💾 Guardar Orden de Servicio", key="t_btn_save"):
-                patron_guardar = ot_patron_txt if ot_patron_txt else st.session_state.patron_secuencia
-                if ot_cliente and ot_equipo and ot_falla:
+            with col_btn_reg2:
+                if st.button("🛠️ Ficha Técnica", use_container_width=True, key=f"btn_ficha_rapida_{fc}"):
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
-                    fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-                    cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, ot_costo, ot_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora))
-                    conn.commit()
-                    
-                    cursor.execute("SELECT last_insert_rowid()")
-                    nueva_id = cursor.fetchone()[0]
+                    cursor.execute("SELECT id FROM ordenes_servicio ORDER BY id DESC LIMIT 1")
+                    ultima_o = cursor.fetchone()
                     conn.close()
-
-                    st.success("¡Orden de servicio guardada con éxito!")
-                    st.session_state.patron_secuencia = ""
-                    st.session_state.recibo_taller = {
-                        "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
-                        "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": ot_costo,
-                        "abono": ot_abono, "estado": "PENDIENTE", "patron": patron_guardar,
-                        "chequeo": ot_notas, "fecha": fecha_ahora
-                    }
-                    st.rerun()
-                else:
-                    st.error("Cliente, equipo y falla son requeridos.")
+                    if ultima_o:
+                        st.session_state.ficha_orden_id = ultima_o[0]
+                        st.rerun()
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
@@ -916,29 +880,61 @@ if cfg['modo_taller'] == 1:
 ==========================================
                 """
                 st.text_area("Ticket Taller", value=ticket_taller_str.strip(), height=260, disabled=True, key="txt_ticket_tall_gen")
-                if st.button("Cerrar Recibo", key="btn_cerrar_recibo_tall"):
-                    st.session_state.recibo_taller = None
-                    st.rerun()
+                
+                logo_base64_str = ""
+                if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
+                    try:
+                        with open(cfg['logo_path'], "rb") as img_file:
+                            logo_base64_str = base64.b64encode(img_file.read()).decode('utf-8')
+                    except:
+                        logo_base64_str = ""
+
+                col_imp1, col_imp2 = st.columns(2)
+                with col_imp1:
+                    if st.button("🖨️ Imprimir Recibo Taller", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
+                        logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
+                        components.html(f"""
+                            <html>
+                            <body onload="window.print()">
+                                <div style="font-family: monospace; font-size: 12px; white-space: pre-wrap; text-align: center;">
+                                    {logo_html}
+                                    {ticket_taller_str}
+                                </div>
+                            </body>
+                            </html>
+                        """, height=0)
+                with col_imp2:
+                    if st.button("Cerrar Recibo", key="btn_cerrar_recibo_tall"):
+                        st.session_state.recibo_taller = None
+                        st.rerun()
 
         st.markdown("---")
-        st.markdown("##### 🔍 Seleccionar Orden para Ficha Técnica y Seguridad")
         
+        col_sel_1, col_sel_2 = st.columns([3, 1])
+        with col_sel_1:
+            conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, cliente, equipo, falla, estado, fecha FROM ordenes_servicio ORDER BY id DESC")
+            todas_ordenes = cursor.fetchall()
+            conn.close()
+
+            opciones_ord = {f"Orden #{o[0]:04d} — {o[1]} ({o[2]}) [Estado: {o[4]}]": o[0] for o in todas_ordenes} if todas_ordenes else {}
+            sel_orden_str = st.selectbox("Seleccione una orden de servicio:", options=list(opciones_ord.keys()) if opciones_ord else ["No hay órdenes registradas"])
+        
+        with col_sel_2:
+            st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
+            if st.button("🛠️ Ver Ficha Técnica", use_container_width=True):
+                if opciones_ord and sel_orden_str in opciones_ord:
+                    st.session_state.ficha_orden_id = opciones_ord[sel_orden_str]
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
         conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, cliente, equipo, falla, estado, fecha FROM ordenes_servicio ORDER BY id DESC")
-        todas_ordenes = cursor.fetchall()
+        df_ordenes_tabla = pd.read_sql("SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, direccion as Dirección, equipo as Equipo, imei as IMEI, falla as Falla, costo as Costo, abono as Abono, estado as Estado, pin_patron as 'Pin/Patron', detalles_chequeo as Chequeo, fecha as Fecha FROM ordenes_servicio ORDER BY id DESC", conn)
         conn.close()
+        st.dataframe(df_ordenes_tabla, use_container_width=True, hide_index=True)
 
-        if todas_ordenes:
-            opciones_ord = {f"Orden #{o[0]:04d} — {o[1]} ({o[2]}) [Estado: {o[4]}]": o[0] for o in todas_ordenes}
-            sel_orden_str = st.selectbox("Seleccione una orden de servicio:", options=list(opciones_ord.keys()))
-            id_orden_elegida = opciones_ord[sel_orden_str]
-
-            if st.button("🛠️ Abrir Ficha Técnica y Seguridad de la Orden Seleccionada", type="secondary"):
-                st.session_state.ficha_orden_id = id_orden_elegida
-        else:
-            st.info("No hay órdenes de servicio registradas.")
-
+        # BANCO DE REPARACIÓN (FICHA TÉCNICA Y SEGURIDAD)
         if st.session_state.ficha_orden_id:
             oid = st.session_state.ficha_orden_id
             conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
@@ -948,41 +944,52 @@ if cfg['modo_taller'] == 1:
             conn.close()
 
             if ord_data:
-                st.markdown(f"""
-                    <div style="background-color: #1e293b; padding: 15px; border-radius: 8px; border: 2px solid #38bdf8; margin-top: 15px;">
-                        <h3 style="color: #38bdf8; margin-top: 0;">🛠️ BANCO DE REPARACIÓN - ORDEN #{ord_data[0]:04d}</h3>
-                        <p><b>Fecha:</b> {ord_data[13]} | <b>Cliente:</b> {ord_data[1]} (CC: {ord_data[2]})</p>
-                        <p><b>Teléfono:</b> {ord_data[3]} | <b>Dirección:</b> {ord_data[4]}</p>
-                        <p><b>Equipo:</b> {ord_data[5]} | <b>IMEI:</b> {ord_data[6]}</p>
-                        <p><b>Falla Reportada:</b> {ord_data[7]}</p>
-                    </div>
-                """, unsafe_allow_html=True)
-
                 c_tot = float(ord_data[8]) if ord_data[8] else 0.0
                 c_abo = float(ord_data[9]) if ord_data[9] else 0.0
                 c_pen = c_tot - c_abo
 
-                col_ft1, col_ft2, col_ft3 = st.columns(3)
-                col_ft1.metric("Costo Total", f"${c_tot:,.2f}")
-                col_ft2.metric("Abonado", f"${c_abo:,.2f}", delta_color="normal")
-                col_ft3.metric("Saldo Pendiente", f"${c_pen:,.2f}", delta_color="inverse")
+                st.markdown(f"""
+                    <div style="background-color: #111822; padding: 20px; border-radius: 10px; border: 2px solid #38bdf8; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f293d; padding-bottom: 10px; margin-bottom: 15px;">
+                            <h3 style="color: #38bdf8; margin: 0;">🛠️ BANCO DE REPARACIÓN - ORDEN #{ord_data[0]:04d}</h3>
+                        </div>
+                        <p style="margin: 4px 0;"><b>Fecha:</b> {ord_data[13]} &nbsp;|&nbsp; <b>Cliente:</b> {ord_data[1]} (CC: {ord_data[2]})</p>
+                        <p style="margin: 4px 0;"><b>Teléfono:</b> {ord_data[3]} &nbsp;|&nbsp; <b>Dirección:</b> {ord_data[4]}</p>
+                        <p style="margin: 4px 0;"><b>Equipo:</b> {ord_data[5]} &nbsp;|&nbsp; <b>IMEI:</b> {ord_data[6]}</p>
+                        <p style="margin: 4px 0;"><b>Falla Reportada:</b> {ord_data[7]}</p>
+                    </div>
+                """, unsafe_allow_html=True)
 
-                st.markdown("##### 🔑 Seguridad y Patrón de Desbloqueo Guardado")
+                st.markdown(f"""
+                    <div style="background-color: #162032; padding: 12px; border-radius: 8px; border: 1px solid #1f293d; margin-top: 10px; display: flex; justify-content: space-around; text-align: center;">
+                        <div><span style="color: #94a3b8; font-size: 12px;">COSTO TOTAL</span><br><span style="color: #00ffcc; font-size: 18px; font-weight: bold;">${c_tot:,.2f}</span></div>
+                        <div><span style="color: #94a3b8; font-size: 12px;">ABONADO</span><br><span style="color: #38bdf8; font-size: 18px; font-weight: bold;">${c_abo:,.2f}</span></div>
+                        <div><span style="color: #94a3b8; font-size: 12px;">SALDO PENDIENTE</span><br><span style="color: #facc15; font-size: 18px; font-weight: bold;">${c_pen:,.2f}</span></div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown("<br>##### 🔑 Seguridad (PIN, Patrón o Contraseña)")
                 
-                def renderizar_patron_svg(secuencia_str, ancho=240, alto=240):
+                def renderizar_patron_svg_guardado(secuencia_str, ancho=240, alto=240):
+                    # El patrón se guarda como una secuencia de números, por ejemplo: 14789.
+                    # Se eliminan los caracteres que no correspondan a los nueve puntos.
+                    sec_limpia = "".join([c for c in str(secuencia_str or "") if c in '123456789'])
                     puntos = {
                         '1': (50, 50),   '2': (120, 50),   '3': (190, 50),
                         '4': (50, 120),  '5': (120, 120),  '6': (190, 120),
                         '7': (50, 190),  '8': (120, 190),  '9': (190, 190)
                     }
-                    digitos = [c for c in str(secuencia_str) if c in '123456789']
+                    digitos = list(sec_limpia)
                     svg_lines = f'<svg width="{ancho}" height="{alto}" style="background-color: #0b132b; border-radius: 8px; border: 2px solid #1f293d;" viewBox="0 0 240 240">'
                     
                     if len(digitos) > 1:
                         for i in range(len(digitos) - 1):
-                            p1 = puntos[digitos[i]]
-                            p2 = puntos[digitos[i+1]]
-                            svg_lines += f'<line x1="{p1[0]}" y1="{p1[1]}" x2="{p2[0]}" y2="{p2[1]}" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" />'
+                            d1 = str(digitos[i])
+                            d2 = str(digitos[i+1])
+                            if d1 in puntos and d2 in puntos:
+                                p1 = puntos[d1]
+                                p2 = puntos[d2]
+                                svg_lines += f'<line x1="{p1[0]}" y1="{p1[1]}" x2="{p2[0]}" y2="{p2[1]}" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" />'
                     
                     for k, coord in puntos.items():
                         activo = k in digitos
@@ -995,22 +1002,79 @@ if cfg['modo_taller'] == 1:
                     svg_lines += '</svg>'
                     return svg_lines
 
-                col_pat_v1, col_pat_v2 = st.columns([1, 2])
+                def renderizar_patron_imagen(secuencia_str, tamano=240):
+                    """Genera una imagen PNG del patrón para mostrarla sin depender del SVG/HTML."""
+                    secuencia = "".join(c for c in str(secuencia_str or "") if c in "123456789")
+                    imagen = Image.new("RGB", (tamano, tamano), "#0b132b")
+                    dibujo = ImageDraw.Draw(imagen)
+                    puntos = {
+                        "1": (50, 50), "2": (120, 50), "3": (190, 50),
+                        "4": (50, 120), "5": (120, 120), "6": (190, 120),
+                        "7": (50, 190), "8": (120, 190), "9": (190, 190)
+                    }
+                    # Ajustar las coordenadas si se cambia el tamaño de la imagen.
+                    escala = tamano / 240
+                    puntos = {k: (int(x * escala), int(y * escala)) for k, (x, y) in puntos.items()}
+                    radio = max(12, int(18 * escala))
+                    grosor = max(2, int(5 * escala))
+
+                    if len(secuencia) > 1:
+                        dibujo.line(
+                            [puntos[d] for d in secuencia],
+                            fill="#38bdf8",
+                            width=grosor,
+                            joint="curve"
+                        )
+
+                    try:
+                        fuente = ImageFont.truetype("DejaVuSans-Bold.ttf", max(12, int(14 * escala)))
+                    except Exception:
+                        fuente = ImageFont.load_default()
+
+                    for numero, (x, y) in puntos.items():
+                        activo = numero in secuencia
+                        dibujo.ellipse(
+                            (x - radio, y - radio, x + radio, y + radio),
+                            fill="#38bdf8" if activo else "#162032",
+                            outline="#ffffff" if activo else "#475569",
+                            width=max(2, int(3 * escala))
+                        )
+                        caja = dibujo.textbbox((0, 0), numero, font=fuente)
+                        dibujo.text(
+                            (x - (caja[2] - caja[0]) / 2, y - (caja[3] - caja[1]) / 2 - 1),
+                            numero,
+                            fill="#000000" if activo else "#94a3b8",
+                            font=fuente
+                        )
+                    return imagen
+
+                col_pat_v1, col_pat_v2 = st.columns([1, 1])
                 with col_pat_v1:
-                    nuevo_patron_edit = st.text_input("Secuencia del Patrón / PIN", value=str(ord_data[11] or ""), key=f"edit_pat_{oid}")
+                    patron_guardado_bd = str(ord_data[11] or "")
+                    
+                    nuevo_patron_edit = st.text_input("Secuencia del Patrón / PIN", value=patron_guardado_bd, key=f"edit_pat_{oid}")
+                    
+                    estados_pos = ["PENDIENTE", "EN REVISIÓN", "REPARADO", "ENTREGADO", "SIN SOLUCIÓN", "ESPERANDO REPUESTO"]
+                    est_actual_idx = estados_pos.index(ord_data[10]) if ord_data[10] in estados_pos else 0
+                    nuevo_estado_edit = st.selectbox("Estado Actual", options=estados_pos, index=est_actual_idx, key=f"edit_est_{oid}")
+                    
+                    nuevo_abono_suma = st.number_input("Sumar Nuevo Abono ($)", min_value=0.0, step=5000.0, key=f"sum_abo_{oid}")
+
                 with col_pat_v2:
-                    st.markdown("##### Patrón Gráfico Actual:")
-                    st.markdown(renderizar_patron_svg(ord_data[11] or ""), unsafe_allow_html=True)
+                    st.markdown("##### Método de Desbloqueo Actual:")
+                    sec_a_dibujar = nuevo_patron_edit if nuevo_patron_edit else patron_guardado_bd
+                    # Streamlit puede sanitizar el SVG cuando se inserta con markdown.
+                    # components.html lo renderiza como HTML real y hace visibles
+                    # las líneas y los puntos del patrón guardado.
+                    if sec_a_dibujar and any(c in '123456789' for c in str(sec_a_dibujar)):
+                        st.image(renderizar_patron_imagen(sec_a_dibujar), width=240)
+                        st.caption(f"Secuencia guardada: {sec_a_dibujar}")
+                    else:
+                        st.info("Esta orden no tiene un patrón guardado.")
                 
-                estados_pos = ["PENDIENTE", "EN REVISIÓN", "REPARADO", "ENTREGADO", "SIN SOLUCIÓN", "ESPERANDO REPUESTO"]
-                est_actual_idx = estados_pos.index(ord_data[10]) if ord_data[10] in estados_pos else 0
-                nuevo_estado_edit = st.selectbox("Estado Actual", options=estados_pos, index=est_actual_idx, key=f"edit_est_{oid}")
-
-                nuevo_abono_suma = st.number_input("Sumar Nuevo Abono ($)", min_value=0.0, step=5000.0, key=f"sum_abo_{oid}")
-
                 col_btn_f1, col_btn_f2, col_btn_f3 = st.columns(3)
                 with col_btn_f1:
-                    if st.button("💾 Guardar Cambios de Ficha"):
+                    if st.button("💾 Guardar Cambios de Ficha", use_container_width=True):
                         try:
                             conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                             cursor = conn.cursor()
@@ -1026,21 +1090,12 @@ if cfg['modo_taller'] == 1:
 
                 with col_btn_f2:
                     msg_w = quote(f"Hola *{ord_data[1]}*, le escribimos de *{cfg['empresa']}*.\n\nSu equipo *{ord_data[5]}* (Orden #{oid:04d}) se encuentra en estado: *{nuevo_estado_edit}*.\nSaldo pendiente: ${c_pen:,.2f}.\n\n¡Gracias por confiar en nosotros!")
-                    st.markdown(f"<br><a href='https://wa.me/57{ord_data[3].replace(' ', '')}?text={msg_w}' target='_blank' style='background-color: #25d366; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; display: block; text-align: center;'>💬 Enviar WhatsApp</a>", unsafe_allow_html=True)
+                    st.markdown(f"<a href='https://wa.me/57{ord_data[3].replace(' ', '')}?text={msg_w}' target='_blank' style='background-color: #25d366; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; display: block; text-align: center; margin-top: 4px;'>💬 Enviar WhatsApp</a>", unsafe_allow_html=True)
 
                 with col_btn_f3:
-                    if st.button("🖨️ Imprimir Recibo Básico"):
-                        st.session_state.recibo_taller = {
-                            "id": ord_data[0], "cliente": ord_data[1], "cedula": ord_data[2], "telefono": ord_data[3],
-                            "equipo": ord_data[5], "imei": ord_data[6], "falla": ord_data[7], "costo": c_tot,
-                            "abono": c_abo + nuevo_abono_suma, "estado": nuevo_estado_edit, "patron": nuevo_patron_edit,
-                            "chequeo": ord_data[12], "fecha": ord_data[13]
-                        }
+                    if st.button("❌ Cerrar Banco de Reparación", use_container_width=True):
+                        st.session_state.ficha_orden_id = None
                         st.rerun()
-
-                if st.button("❌ Cerrar Ficha Técnica"):
-                    st.session_state.ficha_orden_id = None
-                    st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
