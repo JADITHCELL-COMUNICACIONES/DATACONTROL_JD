@@ -35,6 +35,10 @@ st.set_page_config(
 
 VERSION_ACTUAL = "1.6.5"
 
+# Tamaño común para impresión térmica de ventas y órdenes de servicio.
+TAMANO_LETRA_IMPRESION = "16px"
+INTERLINEADO_IMPRESION = "1.35"
+
 # --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
@@ -528,7 +532,7 @@ with tabs[0]:
                     components.html(f"""
                         <html>
                         <body onload="window.print()">
-                            <div style="font-family: monospace; font-size: 12px; white-space: pre-wrap; text-align: center;">
+                            <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
                                 {logo_html}
                                 {ticket_impresion_final}
                             </div>
@@ -844,7 +848,7 @@ if cfg['modo_taller'] == 1:
             fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             saldo_r = rt['costo'] - rt['abono']
 
-            with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d}", expanded=True):
+            with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d} — LISTO PARA IMPRIMIR", expanded=True):
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
                     col_tr1, col_tr2, col_tr3 = st.columns([2, 1, 2])
                     with col_tr2:
@@ -891,12 +895,12 @@ if cfg['modo_taller'] == 1:
 
                 col_imp1, col_imp2 = st.columns(2)
                 with col_imp1:
-                    if st.button("🖨️ Imprimir Recibo Taller", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
+                    if st.button("🖨️ Imprimir Recibo de Orden", type="primary", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
                         logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
                         components.html(f"""
                             <html>
                             <body onload="window.print()">
-                                <div style="font-family: monospace; font-size: 12px; white-space: pre-wrap; text-align: center;">
+                                <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
                                     {logo_html}
                                     {ticket_taller_str}
                                 </div>
@@ -1072,7 +1076,7 @@ if cfg['modo_taller'] == 1:
                     else:
                         st.info("Esta orden no tiene un patrón guardado.")
                 
-                col_btn_f1, col_btn_f2, col_btn_f3 = st.columns(3)
+                col_btn_f1, col_btn_f2, col_btn_f3, col_btn_f4 = st.columns(4)
                 with col_btn_f1:
                     if st.button("💾 Guardar Cambios de Ficha", use_container_width=True):
                         try:
@@ -1096,6 +1100,65 @@ if cfg['modo_taller'] == 1:
                     if st.button("❌ Cerrar Banco de Reparación", use_container_width=True):
                         st.session_state.ficha_orden_id = None
                         st.rerun()
+
+                with col_btn_f4:
+                    if st.button("🖨️ Imprimir Copia", type="primary", use_container_width=True, key=f"btn_imprimir_copia_{oid}"):
+                        # La copia se construye con la información actual de la ficha.
+                        # Si primero se guarda un nuevo abono, c_abo ya contiene el total actualizado.
+                        fecha_copia = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                        saldo_copia = c_tot - c_abo
+                        logo_copia_base64 = ""
+                        if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
+                            try:
+                                with open(cfg['logo_path'], "rb") as archivo_logo:
+                                    logo_copia_base64 = base64.b64encode(archivo_logo.read()).decode("utf-8")
+                            except Exception:
+                                logo_copia_base64 = ""
+                        logo_copia_html = (
+                            f'<img src="data:image/png;base64,{logo_copia_base64}" '
+                            'style="max-width: 110px; display: block; margin: 0 auto 10px auto;" />'
+                            if logo_copia_base64 else ""
+                        )
+                        ticket_copia = f"""
+==========================================
+        {cfg['empresa']}
+       {cfg['propietario']}
+       NIT / CC: {cfg['nit']}
+        {cfg['direccion']}
+        Cel: {cfg['telefono']}
+==========================================
+ ORDEN DE SERVICIO N°: {oid:04d}
+ FECHA DE COPIA: {fecha_copia}
+------------------------------------------
+ CLIENTE: {ord_data[1]}
+ CÉDULA:  {ord_data[2]} | TEL: {ord_data[3]}
+ EQUIPO:  {ord_data[5]}
+ IMEI:    {ord_data[6]}
+ FALLA:   {ord_data[7]}
+ SEGURIDAD/PATRÓN: {nuevo_patron_edit}
+ NOTAS:   {ord_data[12]}
+------------------------------------------
+ COSTO TOTAL:       ${c_tot:,.2f}
+ TOTAL ABONADO:     ${c_abo:,.2f}
+ SALDO PENDIENTE:   ${saldo_copia:,.2f}
+ ESTADO ACTUAL:     {nuevo_estado_edit}
+==========================================
+{cfg['garantia_taller']}
+------------------------------------------
+        COPIA PARA EL CLIENTE
+     ¡GRACIAS POR PREFERIRNOS!
+==========================================
+                        """.strip()
+                        components.html(f"""
+                            <html>
+                            <body onload="window.print()">
+                                <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
+                                    {logo_copia_html}
+                                    {ticket_copia}
+                                </div>
+                            </body>
+                            </html>
+                        """, height=0)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
