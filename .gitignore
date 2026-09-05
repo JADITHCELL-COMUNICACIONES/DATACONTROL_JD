@@ -1,3 +1,27 @@
-git add .
-git commit -m "Actualizacion de sistema"
-git push origin main
+# Base de datos y archivos temporales de SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Carpeta de respaldos
+backups/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Variables y credenciales
+.env
+
+# Archivos temporales del sistema
+*.tmp
+*.temp
+
+# Logs
+*.log
