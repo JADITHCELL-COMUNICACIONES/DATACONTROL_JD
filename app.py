@@ -947,6 +947,7 @@ if cfg['modo_taller'] == 1:
                     with col_tr2:
                         st.image(cfg['logo_path'], width=100)
 
+                # RECIBO QUE VE EL TALLER (INCLUYE PATRÓN)
                 ticket_taller_str = f"""
 ==========================================
         {cfg['empresa']}
@@ -976,7 +977,38 @@ if cfg['modo_taller'] == 1:
    ¡GRACIAS POR PREFERIRNOS!
 ==========================================
                 """
-                st.text_area("Ticket Taller", value=ticket_taller_str.strip(), height=260, disabled=True, key="txt_ticket_tall_gen")
+
+                # RECIBO QUE SE IMPRIME PARA EL CLIENTE (SIN PATRÓN / OMITIDO)
+                ticket_cliente_impresion = f"""
+==========================================
+        {cfg['empresa']}
+       {cfg['propietario']}
+       NIT / CC: {cfg['nit']}
+        {cfg['direccion']}
+        Cel: {cfg['telefono']}
+==========================================
+ ORDEN DE SERVICIO N°: {rt['id']:04d}
+ FECHA: {fecha_taller_actual}
+------------------------------------------
+ CLIENTE: {rt['cliente']}
+ CÉDULA:  {rt['cedula']} | TEL: {rt['telefono']}
+ EQUIPO:  {rt['equipo']}
+ IMEI:    {rt['imei']}
+ FALLA:   {rt['falla']}
+ NOTAS:   {rt['chequeo']}
+------------------------------------------
+ COSTO TOTAL:       ${rt['costo']:,.2f}
+ TOTAL ABONADO:     ${rt['abono']:,.2f}
+ SALDO PENDIENTE:   ${saldo_r:,.2f}
+ ESTADO ACTUAL:     {rt['estado']}
+==========================================
+{cfg['garantia_taller']}
+------------------------------------------
+   ¡GRACIAS POR PREFERIRNOS!
+==========================================
+                """
+
+                st.text_area("Ticket Taller (Vista Previa)", value=ticket_taller_str.strip(), height=260, disabled=True, key="txt_ticket_tall_gen")
                 
                 logo_base64_str = ""
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
@@ -1001,7 +1033,7 @@ if cfg['modo_taller'] == 1:
                             <body onload="window.print()">
                                 <div style="width: 100%; text-align: center;">
                                     {logo_html}
-                                    <div class="ticket-container">{ticket_taller_str}</div>
+                                    <div class="ticket-container">{ticket_cliente_impresion}</div>
                                 </div>
                             </body>
                             </html>
@@ -1209,7 +1241,7 @@ if cfg['modo_taller'] == 1:
                             'style="max-width: 110px; display: block; margin: 0 auto 10px auto;" />'
                             if logo_copia_base64 else ""
                         )
-                        ticket_copia = f"""
+                        ticket_copia_cliente = f"""
 ==========================================
         {cfg['empresa']}
        {cfg['propietario']}
@@ -1225,7 +1257,6 @@ if cfg['modo_taller'] == 1:
  EQUIPO:  {ord_data[5]}
  IMEI:    {ord_data[6]}
  FALLA:   {ord_data[7]}
- SEGURIDAD/PATRÓN: {nuevo_patron_edit}
  NOTAS:   {ord_data[12]}
 ------------------------------------------
  COSTO TOTAL:       ${c_tot:,.2f}
@@ -1250,7 +1281,7 @@ if cfg['modo_taller'] == 1:
                             <body onload="window.print()">
                                 <div style="width: 100%; text-align: center;">
                                     {logo_copia_html}
-                                    <div class="ticket-container">{ticket_copia}</div>
+                                    <div class="ticket-container">{ticket_copia_cliente}</div>
                                 </div>
                             </body>
                             </html>
@@ -1381,4 +1412,4 @@ with tabs[-1]:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- BARRA INFERIOR DE LICENCIA ---
-st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 days)</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
