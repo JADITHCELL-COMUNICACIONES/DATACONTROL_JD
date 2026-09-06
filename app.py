@@ -618,10 +618,16 @@ with tabs[0]:
                     logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
                     components.html(f"""
                         <html>
+                        <head>
+                        <style>
+                            body {{ margin: 0; padding: 0; text-align: center; }}
+                            .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                        </style>
+                        </head>
                         <body onload="window.print()">
-                            <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
+                            <div style="width: 100%; text-align: center;">
                                 {logo_html}
-                                {ticket_impresion_final}
+                                <div class="ticket-container">{ticket_impresion_final}</div>
                             </div>
                         </body>
                         </html>
@@ -986,10 +992,16 @@ if cfg['modo_taller'] == 1:
                         logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
                         components.html(f"""
                             <html>
+                            <head>
+                            <style>
+                                body {{ margin: 0; padding: 0; text-align: center; }}
+                                .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                            </style>
+                            </head>
                             <body onload="window.print()">
-                                <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
+                                <div style="width: 100%; text-align: center;">
                                     {logo_html}
-                                    {ticket_taller_str}
+                                    <div class="ticket-container">{ticket_taller_str}</div>
                                 </div>
                             </body>
                             </html>
@@ -1229,10 +1241,16 @@ if cfg['modo_taller'] == 1:
                         """.strip()
                         components.html(f"""
                             <html>
+                            <head>
+                            <style>
+                                body {{ margin: 0; padding: 0; text-align: center; }}
+                                .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                            </style>
+                            </head>
                             <body onload="window.print()">
-                                <div style="font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; text-align: center;">
+                                <div style="width: 100%; text-align: center;">
                                     {logo_copia_html}
-                                    {ticket_copia}
+                                    <div class="ticket-container">{ticket_copia}</div>
                                 </div>
                             </body>
                             </html>
@@ -1363,4 +1381,4 @@ with tabs[-1]:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- BARRA INFERIOR DE LICENCIA ---
-st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 days)</div>', unsafe_allow_html=True)
