@@ -13,16 +13,89 @@ import base64
 from PIL import Image, ImageDraw, ImageFont
 
 
-# Crear automaticamente el componente si se distribuye solo app.py.
+# --- COMPONENTE DE PATRÓN SEGURO (DIRECTO SIN BASE64) ---
 _COMPONENT_DIR = Path(__file__).resolve().parent / "pattern_drawer"
-_COMPONENT_FILE = _COMPONENT_DIR / "index.html"
-_COMPONENT_HTML_B64 = "PCFkb2N0eXBlIGh0bWw+CjxodG1sIGxhbmc9ImVzIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0idXRmLTgiIC8+CiAgPHN0eWxlPgogICAgaHRtbCwgYm9keSB7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgYmFja2dyb3VuZDogdHJhbnNwYXJlbnQ7IH0KICAgICNjYW52YXMgeyBkaXNwbGF5OiBibG9jazsgd2lkdGg6IDIyMHB4OyBoZWlnaHQ6IDIwMHB4OyBiYWNrZ3JvdW5kOiAjMGYxNzJhOyBib3JkZXI6IDA7IGN1cnNvcjogY3Jvc3NoYWlyOyB0b3VjaC1hY3Rpb246IG5vbmU7IH0KICA8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5PgogIDxjYW52YXMgaWQ9ImNhbnZhcyIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIyMDAiPjwvY2FudmFzPgogIDxzY3JpcHQ+CiAgICAvLyBJbXBsZW1lbnRhY2nDs24gbcOtbmltYSBkZWwgcHJvdG9jb2xvIG9maWNpYWwgZGUgU3RyZWFtbGl0IENvbXBvbmVudHMuCiAgICBjb25zdCBSRUFEWSA9ICdzdHJlYW1saXQ6Y29tcG9uZW50UmVhZHknOwogICAgY29uc3QgUkVOREVSID0gJ3N0cmVhbWxpdDpyZW5kZXInOwogICAgY29uc3QgVkFMVUUgPSAnc3RyZWFtbGl0OnNldENvbXBvbmVudFZhbHVlJzsKICAgIGNvbnN0IEhFSUdIVCA9ICdzdHJlYW1saXQ6c2V0RnJhbWVIZWlnaHQnOwogICAgY29uc3QgY2FudmFzID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhbnZhcycpOwogICAgY29uc3QgY3R4ID0gY2FudmFzLmdldENvbnRleHQoJzJkJyk7CiAgICBjb25zdCBub2RlcyA9IFsKICAgICAge2lkOicxJyx4OjQwLHk6NDB9LHtpZDonMicseDoxMTAseTo0MH0se2lkOiczJyx4OjE4MCx5OjQwfSwKICAgICAge2lkOic0Jyx4OjQwLHk6MTAwfSx7aWQ6JzUnLHg6MTEwLHk6MTAwfSx7aWQ6JzYnLHg6MTgwLHk6MTAwfSwKICAgICAge2lkOic3Jyx4OjQwLHk6MTYwfSx7aWQ6JzgnLHg6MTEwLHk6MTYwfSx7aWQ6JzknLHg6MTgwLHk6MTYwfQogICAgXTsKICAgIGxldCBzZXF1ZW5jZSA9IFtdOwogICAgbGV0IGRyYXdpbmcgPSBmYWxzZTsKCiAgICBmdW5jdGlvbiBzZW5kKHR5cGUsIGRhdGEpIHsKICAgICAgd2luZG93LnBhcmVudC5wb3N0TWVzc2FnZShPYmplY3QuYXNzaWduKHtpc1N0cmVhbWxpdE1lc3NhZ2U6dHJ1ZSwgdHlwZTp0eXBlfSwgZGF0YSB8fCB7fSksICcqJyk7CiAgICB9CiAgICBmdW5jdGlvbiBzZXRWYWx1ZSgpIHsgc2VuZChWQUxVRSwge3ZhbHVlOnNlcXVlbmNlLmpvaW4oJycpLCBkYXRhVHlwZTonanNvbid9KTsgfQogICAgZnVuY3Rpb24gZHJhdygpIHsKICAgICAgY3R4LmNsZWFyUmVjdCgwLDAsY2FudmFzLndpZHRoLGNhbnZhcy5oZWlnaHQpOwogICAgICBpZiAoc2VxdWVuY2UubGVuZ3RoID4gMSkgewogICAgICAgIGNvbnN0IGNvb3JkcyA9IHNlcXVlbmNlLm1hcChpZCA9PiBub2Rlcy5maW5kKG4gPT4gbi5pZCA9PT0gaWQpKTsKICAgICAgICBjdHguYmVnaW5QYXRoKCk7IGN0eC5tb3ZlVG8oY29vcmRzWzBdLngsIGNvb3Jkc1swXS55KTsKICAgICAgICBjb29yZHMuc2xpY2UoMSkuZm9yRWFjaChuID0+IGN0eC5saW5lVG8obi54LG4ueSkpOwogICAgICAgIGN0eC5zdHJva2VTdHlsZT0nIzAyODRjNyc7IGN0eC5saW5lV2lkdGg9NTsgY3R4LmxpbmVDYXA9J3JvdW5kJzsgY3R4LmxpbmVKb2luPSdyb3VuZCc7IGN0eC5zdHJva2UoKTsKICAgICAgICBjdHguc3Ryb2tlU3R5bGU9JyMzOGJkZjgnOyBjdHgubGluZVdpZHRoPTIuNTsgY3R4LnN0cm9rZSgpOwogICAgICB9CiAgICAgIG5vZGVzLmZvckVhY2gobiA9PiB7CiAgICAgICAgY29uc3QgYWN0aXZlID0gc2VxdWVuY2UuaW5jbHVkZXMobi5pZCk7CiAgICAgICAgaWYgKGFjdGl2ZSkgeyBjdHguYmVnaW5QYXRoKCk7IGN0eC5hcmMobi54LG4ueSwxOCwwLE1hdGguUEkqMik7IGN0eC5zdHJva2VTdHlsZT0nIzM4YmRmOCc7IGN0eC5saW5lV2lkdGg9MjsgY3R4LnN0cm9rZSgpOyB9CiAgICAgICAgY3R4LmJlZ2luUGF0aCgpOyBjdHguYXJjKG4ueCxuLnksYWN0aXZlPzE0OjksMCxNYXRoLlBJKjIpOwogICAgICAgIGN0eC5maWxsU3R5bGU9YWN0aXZlPycjMjJjNTVlJzonIzFlMjkzYic7IGN0eC5maWxsKCk7IGN0eC5zdHJva2VTdHlsZT0nIzM4YmRmOCc7IGN0eC5saW5lV2lkdGg9MjsgY3R4LnN0cm9rZSgpOwogICAgICAgIGN0eC5maWxsU3R5bGU9YWN0aXZlPyd3aGl0ZSc6JyM5NGEzYjgnOyBjdHguZm9udD0nYm9sZCAxMHB4IEFyaWFsJzsgY3R4LnRleHRBbGlnbj0nY2VudGVyJzsgY3R4LnRleHRCYXNlbGluZT0nbWlkZGxlJzsgY3R4LmZpbGxUZXh0KG4uaWQsbi54LG4ueSk7CiAgICAgIH0pOwogICAgfQogICAgZnVuY3Rpb24gZmluZFBvaW50KGUpIHsKICAgICAgY29uc3Qgcj1jYW52YXMuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7CiAgICAgIGNvbnN0IHg9KGUuY2xpZW50WC1yLmxlZnQpKmNhbnZhcy53aWR0aC9yLndpZHRoLCB5PShlLmNsaWVudFktci50b3ApKmNhbnZhcy5oZWlnaHQvci5oZWlnaHQ7CiAgICAgIHJldHVybiBub2Rlcy5maW5kKG4gPT4gTWF0aC5hYnMoeC1uLngpPDI1ICYmIE1hdGguYWJzKHktbi55KTwyNSk7CiAgICB9CiAgICBjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcmRvd24nLCBlID0+IHsKICAgICAgZS5wcmV2ZW50RGVmYXVsdCgpOyBkcmF3aW5nPXRydWU7IHNlcXVlbmNlPVtdOyBjb25zdCBuPWZpbmRQb2ludChlKTsgaWYobikgc2VxdWVuY2UucHVzaChuLmlkKTsgZHJhdygpOyBzZXRWYWx1ZSgpOwogICAgfSk7CiAgICBjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcigncG9pbnRlcm1vdmUnLCBlID0+IHsKICAgICAgaWYoIWRyYXdpbmcpIHJldHVybjsgZS5wcmV2ZW50RGVmYXVsdCgpOyBjb25zdCBuPWZpbmRQb2ludChlKTsKICAgICAgaWYobiAmJiAhc2VxdWVuY2UuaW5jbHVkZXMobi5pZCkpIHsgc2VxdWVuY2UucHVzaChuLmlkKTsgZHJhdygpOyBzZXRWYWx1ZSgpOyB9CiAgICB9KTsKICAgIHdpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdwb2ludGVydXAnLCAoKSA9PiB7IGlmKGRyYXdpbmcpeyBkcmF3aW5nPWZhbHNlOyBzZXRWYWx1ZSgpOyB9IH0pOwogICAgd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ21lc3NhZ2UnLCBlID0+IHsKICAgICAgaWYoZS5kYXRhICYmIGUuZGF0YS50eXBlPT09UkVOREVSKSB7CiAgICAgICAgY29uc3QgaW5jb21pbmc9U3RyaW5nKChlLmRhdGEuYXJnc3x8e30pLnNlcXVlbmNlfHwnJykucmVwbGFjZSgvW14xLTldL2csJycpOwogICAgICAgIGlmKCFkcmF3aW5nKSBzZXF1ZW5jZT1pbmNvbWluZy5zcGxpdCgnJyk7IGRyYXcoKTsKICAgICAgfQogICAgfSk7CiAgICBzZW5kKFJFQURZLCB7YXBpVmVyc2lvbjoxfSk7CiAgICBzZW5kKEhFSUdIVCwge2hlaWdodDoyMDV9KTsKICAgIGRyYXcoKTsKICA8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+Cg=="
 _COMPONENT_DIR.mkdir(parents=True, exist_ok=True)
-_COMPONENT_FILE.write_bytes(base64.b64decode(_COMPONENT_HTML_B64))
+_COMPONENT_FILE = _COMPONENT_DIR / "index.html"
+
+_HTML_PATRON_CONTENIDO = """<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body { margin: 0; padding: 0; background: transparent; }
+    canvas { display: block; width: 220px; height: 200px; background: #0f172a; border: 0; cursor: crosshair; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="220" height="200"></canvas>
+  <script>
+    const READY = 'streamlit:componentReady';
+    const RENDER = 'streamlit:render';
+    const VALUE = 'streamlit:setComponentValue';
+    const HEIGHT = 'streamlit:setFrameHeight';
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const nodes = [
+      {id:'1',x:40,y:40},{id:'2',x:110,y:40},{id:'3',x:180,y:40},
+      {id:'4',x:40,y:100},{id:'5',x:110,y:100},{id:'6',x:180,y:100},
+      {id:'7',x:40,y:160},{id:'8',x:110,y:160},{id:'9',x:180,y:160}
+    ];
+    let sequence = [];
+    let drawing = false;
+
+    function send(type, data) {
+      window.parent.postMessage(Object.assign({isStreamlitMessage:true, type:type}, data || {}), '*');
+    }
+    function setValue() { send(VALUE, {value:sequence.join(''), dataType:'json'}); }
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if (sequence.length > 1) {
+        const coords = sequence.map(id => nodes.find(n => n.id === id));
+        ctx.beginPath(); ctx.moveTo(coords[0].x, coords[0].y);
+        coords.slice(1).forEach(n => ctx.lineTo(n.x,n.y));
+        ctx.strokeStyle='#0284c7'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke();
+        ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2.5; ctx.stroke();
+      }
+      nodes.forEach(n => {
+        const active = sequence.includes(n.id);
+        if (active) { ctx.beginPath(); ctx.arc(n.x,n.y,18,0,Math.PI*2); ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2; ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(n.x,n.y,active?14:9,0,Math.PI*2);
+        ctx.fillStyle=active?'#22c55e':'#1e293b'; ctx.fill(); ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2; ctx.stroke();
+        ctx.fillStyle=active?'white':'#94a3b8'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(n.id,n.x,n.y);
+      });
+    }
+    function findPoint(e) {
+      const r=canvas.getBoundingClientRect();
+      const x=(e.clientX-r.left)*canvas.width/r.width, y=(e.clientY-r.top)*canvas.height/r.height;
+      return nodes.find(n => Math.abs(x-n.x)<25 && Math.abs(y-n.y)<25);
+    }
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault(); drawing=true; sequence=[]; const n=findPoint(e); if(n) sequence.push(n.id); draw(); setValue();
+    });
+    canvas.addEventListener('pointermove', e => {
+      if(!drawing) return; e.preventDefault(); const n=findPoint(e);
+      if(n && !sequence.includes(n.id)) { sequence.push(n.id); draw(); setValue(); }
+    });
+    window.addEventListener('pointerup', () => { if(drawing){ drawing=false; setValue(); } });
+    window.addEventListener('message', e => {
+      if(e.data && e.data.type===RENDER) {
+        const incoming=String((e.data.args||{}).sequence||'').replace(/[^1-9]/g,'');
+        if(!drawing) sequence=incoming.split(''); draw();
+      }
+    });
+    send(READY, {apiVersion:1});
+    send(HEIGHT, {height:205});
+    draw();
+  </script>
+</body>
+</html>"""
+
+_COMPONENT_FILE.write_text(_HTML_PATRON_CONTENIDO, encoding="utf-8")
 
 pattern_drawer_component = components.declare_component(
     "pattern_drawer",
-    path=str(Path(__file__).resolve().parent / "pattern_drawer")
+    path=str(_COMPONENT_DIR)
 )
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -43,7 +116,7 @@ INTERLINEADO_IMPRESION = "1.35"
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
-# --- ESTILOS VISUALES IDÉNTICOS AL ESCRITORIO ---
+# --- ESTILOS VISUALES Y MÓDULOS EN VERDE CON ACTIVO EN ROJO ---
 st.markdown("""
     <style>
     .stApp {
@@ -110,6 +183,20 @@ st.markdown("""
         font-size: 16px !important;
         height: 45px !important;
         border: none !important;
+    }
+    /* Estilos para los módulos (pestañas): Verde por defecto, Rojo al estar activo */
+    .stTabs [data-baseweb="tab-list"] button div p,
+    .stTabs [data-baseweb="tab-list"] button {
+        color: #22c55e !important;
+        font-weight: bold !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] div p,
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+        color: #ef4444 !important;
+        font-weight: bold !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #ef4444 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -975,8 +1062,6 @@ if cfg['modo_taller'] == 1:
                 st.markdown("<br>##### 🔑 Seguridad (PIN, Patrón o Contraseña)")
                 
                 def renderizar_patron_svg_guardado(secuencia_str, ancho=240, alto=240):
-                    # El patrón se guarda como una secuencia de números, por ejemplo: 14789.
-                    # Se eliminan los caracteres que no correspondan a los nueve puntos.
                     sec_limpia = "".join([c for c in str(secuencia_str or "") if c in '123456789'])
                     puntos = {
                         '1': (50, 50),   '2': (120, 50),   '3': (190, 50),
@@ -1007,7 +1092,6 @@ if cfg['modo_taller'] == 1:
                     return svg_lines
 
                 def renderizar_patron_imagen(secuencia_str, tamano=240):
-                    """Genera una imagen PNG del patrón para mostrarla sin depender del SVG/HTML."""
                     secuencia = "".join(c for c in str(secuencia_str or "") if c in "123456789")
                     imagen = Image.new("RGB", (tamano, tamano), "#0b132b")
                     dibujo = ImageDraw.Draw(imagen)
@@ -1016,7 +1100,6 @@ if cfg['modo_taller'] == 1:
                         "4": (50, 120), "5": (120, 120), "6": (190, 120),
                         "7": (50, 190), "8": (120, 190), "9": (190, 190)
                     }
-                    # Ajustar las coordenadas si se cambia el tamaño de la imagen.
                     escala = tamano / 240
                     puntos = {k: (int(x * escala), int(y * escala)) for k, (x, y) in puntos.items()}
                     radio = max(12, int(18 * escala))
@@ -1067,9 +1150,6 @@ if cfg['modo_taller'] == 1:
                 with col_pat_v2:
                     st.markdown("##### Método de Desbloqueo Actual:")
                     sec_a_dibujar = nuevo_patron_edit if nuevo_patron_edit else patron_guardado_bd
-                    # Streamlit puede sanitizar el SVG cuando se inserta con markdown.
-                    # components.html lo renderiza como HTML real y hace visibles
-                    # las líneas y los puntos del patrón guardado.
                     if sec_a_dibujar and any(c in '123456789' for c in str(sec_a_dibujar)):
                         st.image(renderizar_patron_imagen(sec_a_dibujar), width=240)
                         st.caption(f"Secuencia guardada: {sec_a_dibujar}")
@@ -1103,8 +1183,6 @@ if cfg['modo_taller'] == 1:
 
                 with col_btn_f4:
                     if st.button("🖨️ Imprimir Copia", type="primary", use_container_width=True, key=f"btn_imprimir_copia_{oid}"):
-                        # La copia se construye con la información actual de la ficha.
-                        # Si primero se guarda un nuevo abono, c_abo ya contiene el total actualizado.
                         fecha_copia = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                         saldo_copia = c_tot - c_abo
                         logo_copia_base64 = ""
@@ -1207,45 +1285,44 @@ with tabs[-1]:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("##### 🛡️ Mantenimiento y Seguridad (Respaldos y Restauración)")
+    st.markdown("##### 🛡️ Mantenimiento y Seguridad (Respaldos en la Nube)")
     
     col_resp1, col_resp2 = st.columns(2)
     with col_resp1:
-        if st.button("💾 Crear Respaldo Manual Ahora", use_container_width=True):
+        if os.path.exists("jadithcell_comunicaciones.db"):
+            with open("jadithcell_comunicaciones.db", "rb") as f:
+                db_bytes = f.read()
+            fecha_b = obtener_tiempo_colombia().strftime("%Y%m%d_%H%M%S")
+            st.download_button(
+                label="📥 Descargar Respaldo Directo (.db)",
+                data=db_bytes,
+                file_name=f"backup_jadithcell_{fecha_b}.db",
+                mime="application/octet-stream",
+                use_container_width=True
+            )
+        else:
+            st.warning("No se encontró la base de datos.")
+
+    with col_resp2:
+        if st.button("💾 Guardar Respaldo en Servidor Cloud", use_container_width=True):
             os.makedirs("backups", exist_ok=True)
             fecha_b = obtener_tiempo_colombia().strftime("%Y%m%d_%H%M%S")
             backup_name = os.path.join("backups", f"backup_jadithcell_{fecha_b}.db")
             try:
                 shutil.copyfile("jadithcell_comunicaciones.db", backup_name)
-                st.success(f"¡Respaldo creado con éxito en la carpeta backups/!")
+                st.success("¡Respaldo interno creado en backups/!")
             except Exception as e:
-                st.error(f"Error creando respaldo: {e}")
-
-    with col_resp2:
-        if st.button("📂 Abrir Carpeta de Respaldos", use_container_width=True):
-            os.makedirs("backups", exist_ok=True)
-            ruta_absoluta = os.path.abspath("backups")
-            try:
-                os.startfile(ruta_absoluta)
-                st.success(f"Carpeta abierta: {ruta_absoluta}")
-            except:
-                st.info(f"La ruta de la carpeta de respaldos es: {ruta_absoluta}")
+                st.error(f"Error: {e}")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("##### 🔄 Restaurar Sistema desde Archivo de Respaldo (.db)")
-    archivo_respaldo_subido = st.file_uploader("Selecciona un archivo de base de datos de respaldo (.db)", type=["db"], key="uploader_restaurar_db")
+    archivo_respaldo_subido = st.file_uploader("Elige un archivo de base de datos desde cualquier ubicación de tu equipo (.db)", type=["db"], key="uploader_restaurar_db")
     
     if archivo_respaldo_subido is not None:
         if st.button("⚠️ Confirmar y Restaurar Base de Datos", type="primary"):
             try:
-                ruta_temporal = "temp_restore.db"
-                with open(ruta_temporal, "wb") as f:
+                with open("jadithcell_comunicaciones.db", "wb") as f:
                     f.write(archivo_respaldo_subido.getbuffer())
-                
-                shutil.copyfile(ruta_temporal, "jadithcell_comunicaciones.db")
-                if os.path.exists(ruta_temporal):
-                    os.remove(ruta_temporal)
-                
                 st.success("¡Base de datos restaurada con éxito! Recargando sistema...")
                 st.rerun()
             except Exception as ex:
