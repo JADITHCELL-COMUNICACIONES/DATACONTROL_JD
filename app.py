@@ -13,7 +13,7 @@ import base64
 from PIL import Image, ImageDraw, ImageFont
 
 
-# --- COMPONENTE DE PATRÓN SEGURO (DIRECTO SIN BASE64) ---
+# --- COMPONENTE DE PATRÓN SEGURO ---
 _COMPONENT_DIR = Path(__file__).resolve().parent / "pattern_drawer"
 _COMPONENT_DIR.mkdir(parents=True, exist_ok=True)
 _COMPONENT_FILE = _COMPONENT_DIR / "index.html"
@@ -98,6 +98,91 @@ pattern_drawer_component = components.declare_component(
     path=str(_COMPONENT_DIR)
 )
 
+
+# --- COMPONENTE DE FIRMA AUTOMÁTICO ---
+_SIGN_DIR = Path(__file__).resolve().parent / "signature_pad"
+_SIGN_DIR.mkdir(parents=True, exist_ok=True)
+_SIGN_FILE = _SIGN_DIR / "index.html"
+
+_HTML_FIRMA_CONTENIDO = """<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body { margin: 0; padding: 0; background: transparent; text-align: center; }
+    canvas { display: block; width: 420px; height: 130px; background: #ffffff; border: 2px dashed #38bdf8; border-radius: 8px; cursor: crosshair; touch-action: none; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="420" height="130"></canvas>
+  <script>
+    const READY = 'streamlit:componentReady';
+    const RENDER = 'streamlit:render';
+    const VALUE = 'streamlit:setComponentValue';
+    const HEIGHT = 'streamlit:setFrameHeight';
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    function send(type, data) {
+      window.parent.postMessage(Object.assign({isStreamlitMessage:true, type:type}, data || {}), '*');
+    }
+    function setValue(val) { send(VALUE, {value:val, dataType:'json'}); }
+
+    function getPos(e) {
+      const r = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) * (canvas.width / r.width),
+        y: (e.clientY - r.top) * (canvas.height / r.height)
+      };
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault(); drawing = true;
+      const p = getPos(e);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      if (!drawing) return;
+      e.preventDefault();
+      const p = getPos(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = '#000000'; ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+      setValue(canvas.toDataURL('image/png'));
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (drawing) {
+        drawing = false;
+        setValue(canvas.toDataURL('image/png'));
+      }
+    });
+
+    window.addEventListener('message', e => {
+      if(e.data && e.data.type===RENDER) {
+        const incoming = (e.data.args||{}).sequence;
+        if(!incoming) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    });
+
+    send(READY, {apiVersion:1});
+    send(HEIGHT, {height:140});
+  </script>
+</body>
+</html>"""
+
+_SIGN_FILE.write_text(_HTML_FIRMA_CONTENIDO, encoding="utf-8")
+
+signature_pad_component = components.declare_component(
+    "signature_pad",
+    path=str(_SIGN_DIR)
+)
+
+
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
     page_title="DATACONTROL JD - JADITHCELL COMUNICACIONES",
@@ -106,13 +191,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.6.5"
+VERSION_ACTUAL = "1.8.6"
 
-# Tamaño común para impresión térmica de ventas y órdenes de servicio.
 TAMANO_LETRA_IMPRESION = "16px"
 INTERLINEADO_IMPRESION = "1.35"
 
-# --- FUNCIÓN PARA OBTENER HORA EXACTA DE COLOMBIA (UTC-5) ---
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
@@ -184,7 +267,6 @@ st.markdown("""
         height: 45px !important;
         border: none !important;
     }
-    /* Estilos para los módulos (pestañas): Verde por defecto, Rojo al estar activo */
     .stTabs [data-baseweb="tab-list"] button div p,
     .stTabs [data-baseweb="tab-list"] button {
         color: #22c55e !important;
@@ -294,7 +376,8 @@ def inicializar_bd():
         "ALTER TABLE ventas ADD COLUMN prestamo INTEGER DEFAULT 0",
         "ALTER TABLE ventas ADD COLUMN imei1 TEXT",
         "ALTER TABLE ventas ADD COLUMN imei2 TEXT",
-        "ALTER TABLE ventas ADD COLUMN notas TEXT"
+        "ALTER TABLE ventas ADD COLUMN notas TEXT",
+        "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT"
     ]:
         try:
             cursor.execute(col_sql)
@@ -346,6 +429,7 @@ if 'recibo_generado' not in st.session_state: st.session_state.recibo_generado =
 if 'recibo_taller' not in st.session_state: st.session_state.recibo_taller = None
 if 'ficha_orden_id' not in st.session_state: st.session_state.ficha_orden_id = None
 if 'patron_secuencia' not in st.session_state: st.session_state.patron_secuencia = ""
+if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia = ""
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
@@ -810,7 +894,7 @@ if cfg['modo_taller'] == 1:
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
         st.subheader("🛠️ Órdenes de Servicio y Ficha Técnica")
         
-        # Lienzo interactivo real: devuelve la secuencia dibujada a Python.
+        # Lienzo interactivo real para patrón
         def renderizar_lienzo_patron(secuencia_actual):
             secuencia_inicial = "".join(
                 c for c in str(secuencia_actual or "") if c in "123456789"
@@ -824,6 +908,18 @@ if cfg['modo_taller'] == 1:
             secuencia = "".join(c for c in str(secuencia) if c in "123456789")
             st.session_state.patron_secuencia = secuencia
             st.caption(f"Secuencia actual: {secuencia or '—'}")
+            return secuencia
+
+        # Pad de firma automático que actualiza la base64 mientras el usuario dibuja trazo a trazo
+        def renderizar_pad_firma(secuencia_actual):
+            sec_inicial = str(secuencia_actual or "")
+            secuencia = signature_pad_component(
+                sequence=sec_inicial,
+                key=f"signature_pad_{st.session_state.form_counter}"
+            )
+            if secuencia is None:
+                secuencia = sec_inicial
+            st.session_state.firma_secuencia = secuencia
             return secuencia
 
         fc = st.session_state.form_counter
@@ -855,11 +951,8 @@ if cfg['modo_taller'] == 1:
                 
                 ot_patron_txt = st.text_input("Patrón, PIN o Contraseña", placeholder="Patrón, PIN o Contraseña", key=f"t_pat_{fc}")
 
-            # Esta sección queda fuera de las tres columnas para que el lienzo
-            # siempre sea visible durante el registro de una nueva orden.
             st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
             st.markdown("<div class='lbl-celeste'>🔐 Dibujar Patrón de Desbloqueo (Opcional)</div>", unsafe_allow_html=True)
-            st.caption("Mantenga presionado el botón del mouse o el dedo y arrástrelo por los puntos en orden.")
             patron_col_1, patron_col_2 = st.columns([3, 1])
             with patron_col_1:
                 val_lienzo_canvas = renderizar_lienzo_patron(st.session_state.patron_secuencia)
@@ -871,14 +964,33 @@ if cfg['modo_taller'] == 1:
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
+            # --- PAD DE FIRMA DIGITAL AUTOMÁTICO (MULTITRAZO) ---
+            st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+            st.markdown("<div class='lbl-celeste'>✍️ Firma del Cliente (Digital / Táctil / Mouse)</div>", unsafe_allow_html=True)
+            st.caption("Firme con tranquilidad trazo por trazo (puede levantar el dedo o mouse sin perder la firma):")
+            
+            firma_col_1, firma_col_2 = st.columns([3, 1])
+            with firma_col_1:
+                val_firma_canvas = renderizar_pad_firma(st.session_state.firma_secuencia)
+                if val_firma_canvas and isinstance(val_firma_canvas, str):
+                    st.session_state.firma_secuencia = val_firma_canvas
+            with firma_col_2:
+                if st.button("🧹 Limpiar Firma", key=f"btn_limpiar_firma_{fc}", use_container_width=True):
+                    st.session_state.firma_secuencia = ""
+                    st.rerun()
+
+            if st.session_state.firma_secuencia:
+                st.success("✓ Firma capturada correctamente")
+
             ot_notas = st.text_input("Notas adicionales / Chequeo físico", placeholder="Notas adicionales / Chequeo físico", key=f"t_not_{fc}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             col_btn_reg1, col_btn_reg2 = st.columns([4, 1])
             with col_btn_reg1:
                 if st.button("💾 Guardar Orden", type="primary", use_container_width=True, key=f"t_btn_save_{fc}"):
-                    # PRIORIDAD ABSOLUTA: Si escribiste en la casilla de texto se usa eso, de lo contrario se toma lo que se dibujó en el canvas
                     patron_guardar = ot_patron_txt.strip() if ot_patron_txt else st.session_state.patron_secuencia.strip()
+                    firma_guardar = st.session_state.firma_secuencia if isinstance(st.session_state.firma_secuencia, str) else ""
                     
                     def limpiar_monto(val_txt):
                         if not val_txt: return 0.0
@@ -901,9 +1013,9 @@ if cfg['modo_taller'] == 1:
                         conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                         cursor = conn.cursor()
                         fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-                        cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha)
-                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                       (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora))
+                        cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                       (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
                         conn.commit()
                         
                         cursor.execute("SELECT last_insert_rowid()")
@@ -913,13 +1025,14 @@ if cfg['modo_taller'] == 1:
                         st.success("¡Orden de servicio guardada con éxito!")
                         
                         st.session_state.patron_secuencia = ""
+                        st.session_state.firma_secuencia = ""
                         st.session_state.form_counter += 1
                         
                         st.session_state.recibo_taller = {
                             "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
                             "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
                             "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
-                            "chequeo": ot_notas, "fecha": fecha_ahora
+                            "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
                         }
                         st.rerun()
                     else:
@@ -947,7 +1060,6 @@ if cfg['modo_taller'] == 1:
                     with col_tr2:
                         st.image(cfg['logo_path'], width=100)
 
-                # RECIBO QUE VE EL TALLER (INCLUYE PATRÓN)
                 ticket_taller_str = f"""
 ==========================================
         {cfg['empresa']}
@@ -978,7 +1090,6 @@ if cfg['modo_taller'] == 1:
 ==========================================
                 """
 
-                # RECIBO QUE SE IMPRIME PARA EL CLIENTE (SIN PATRÓN / OMITIDO)
                 ticket_cliente_impresion = f"""
 ==========================================
         {cfg['empresa']}
@@ -1004,11 +1115,9 @@ if cfg['modo_taller'] == 1:
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
-   ¡GRACIAS POR PREFERIRNOS!
-==========================================
-                """
+"""
 
-                st.text_area("Ticket Taller (Vista Previa)", value=ticket_taller_str.strip(), height=260, disabled=True, key="txt_ticket_tall_gen")
+                st.text_area("Ticket Taller", value=ticket_taller_str.strip(), height=260, disabled=True, key="txt_ticket_tall_gen")
                 
                 logo_base64_str = ""
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
@@ -1022,6 +1131,22 @@ if cfg['modo_taller'] == 1:
                 with col_imp1:
                     if st.button("🖨️ Imprimir Recibo de Orden", type="primary", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
                         logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
+                        
+                        # Extracción directa desde la base de datos
+                        conn_f = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+                        cur_f = conn_f.cursor()
+                        cur_f.execute("SELECT firma_path FROM ordenes_servicio WHERE id = ?", (rt['id'],))
+                        res_f = cur_f.fetchone()
+                        conn_f.close()
+                        
+                        firma_url_final = res_f[0] if res_f and res_f[0] else rt.get('firma', '')
+                        
+                        firma_html = ""
+                        if firma_url_final and str(firma_url_final).startswith('data:image'):
+                            firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_url_final}" style="max-width: 140px; height: auto; border-bottom: 1px solid #000;" /></div>'
+
+                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+
                         components.html(f"""
                             <html>
                             <head>
@@ -1034,6 +1159,8 @@ if cfg['modo_taller'] == 1:
                                 <div style="width: 100%; text-align: center;">
                                     {logo_html}
                                     <div class="ticket-container">{ticket_cliente_impresion}</div>
+                                    {firma_html}
+                                    {cierre_html}
                                 </div>
                             </body>
                             </html>
@@ -1074,7 +1201,7 @@ if cfg['modo_taller'] == 1:
             oid = st.session_state.ficha_orden_id
             conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
             cursor = conn.cursor()
-            cursor.execute("SELECT id, cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, fecha FROM ordenes_servicio WHERE id = ?", (oid,))
+            cursor.execute("SELECT id, cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, fecha, firma_path FROM ordenes_servicio WHERE id = ?", (oid,))
             ord_data = cursor.fetchone()
             conn.close()
 
@@ -1105,36 +1232,6 @@ if cfg['modo_taller'] == 1:
 
                 st.markdown("<br>##### 🔑 Seguridad (PIN, Patrón o Contraseña)")
                 
-                def renderizar_patron_svg_guardado(secuencia_str, ancho=240, alto=240):
-                    sec_limpia = "".join([c for c in str(secuencia_str or "") if c in '123456789'])
-                    puntos = {
-                        '1': (50, 50),   '2': (120, 50),   '3': (190, 50),
-                        '4': (50, 120),  '5': (120, 120),  '6': (190, 120),
-                        '7': (50, 190),  '8': (120, 190),  '9': (190, 190)
-                    }
-                    digitos = list(sec_limpia)
-                    svg_lines = f'<svg width="{ancho}" height="{alto}" style="background-color: #0b132b; border-radius: 8px; border: 2px solid #1f293d;" viewBox="0 0 240 240">'
-                    
-                    if len(digitos) > 1:
-                        for i in range(len(digitos) - 1):
-                            d1 = str(digitos[i])
-                            d2 = str(digitos[i+1])
-                            if d1 in puntos and d2 in puntos:
-                                p1 = puntos[d1]
-                                p2 = puntos[d2]
-                                svg_lines += f'<line x1="{p1[0]}" y1="{p1[1]}" x2="{p2[0]}" y2="{p2[1]}" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" />'
-                    
-                    for k, coord in puntos.items():
-                        activo = k in digitos
-                        fill_color = "#38bdf8" if activo else "#162032"
-                        stroke_color = "#ffffff" if activo else "#475569"
-                        text_color = "#000000" if activo else "#94a3b8"
-                        svg_lines += f'<circle cx="{coord[0]}" cy="{coord[1]}" r="18" fill="{fill_color}" stroke="{stroke_color}" stroke-width="3" />'
-                        svg_lines += f'<text x="{coord[0]}" y="{coord[1]+5}" font-family="Arial" font-size="14" font-weight="bold" fill="{text_color}" text-anchor="middle">{k}</text>'
-                        
-                    svg_lines += '</svg>'
-                    return svg_lines
-
                 def renderizar_patron_imagen(secuencia_str, tamano=240):
                     secuencia = "".join(c for c in str(secuencia_str or "") if c in "123456789")
                     imagen = Image.new("RGB", (tamano, tamano), "#0b132b")
@@ -1199,6 +1296,11 @@ if cfg['modo_taller'] == 1:
                         st.caption(f"Secuencia guardada: {sec_a_dibujar}")
                     else:
                         st.info("Esta orden no tiene un patrón guardado.")
+                    
+                    firma_bd_url = ord_data[14] if len(ord_data) > 14 and ord_data[14] else ""
+                    if firma_bd_url and str(firma_bd_url).startswith('data:image'):
+                        st.markdown("<br>##### ✍️ Firma Registrada:", unsafe_allow_html=True)
+                        st.image(firma_bd_url, width=220)
                 
                 col_btn_f1, col_btn_f2, col_btn_f3, col_btn_f4 = st.columns(4)
                 with col_btn_f1:
@@ -1266,10 +1368,15 @@ if cfg['modo_taller'] == 1:
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
-        COPIA PARA EL CLIENTE
-     ¡GRACIAS POR PREFERIRNOS!
-==========================================
-                        """.strip()
+""".strip()
+                        
+                        firma_copia_html = ""
+                        firma_bd_url = ord_data[14] if len(ord_data) > 14 and ord_data[14] else ""
+                        if firma_bd_url and str(firma_bd_url).startswith('data:image'):
+                            firma_copia_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_bd_url}" style="max-width: 140px; height: auto; border-bottom: 1px solid #000;" /></div>'
+
+                        cierre_copia_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+
                         components.html(f"""
                             <html>
                             <head>
@@ -1282,6 +1389,8 @@ if cfg['modo_taller'] == 1:
                                 <div style="width: 100%; text-align: center;">
                                     {logo_copia_html}
                                     <div class="ticket-container">{ticket_copia_cliente}</div>
+                                    {firma_copia_html}
+                                    {cierre_copia_html}
                                 </div>
                             </body>
                             </html>
