@@ -191,9 +191,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.26"
+VERSION_ACTUAL = "1.8.27"
 
-TAMANO_LETRA_IMPRESION = "13.5px"
+TAMANO_LETRA_IMPRESION = "13px"
 INTERLINEADO_IMPRESION = "1.3"
 
 def obtener_tiempo_colombia():
@@ -619,7 +619,7 @@ with tabs[0]:
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
                         cursor.execute("INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (itm['codigo'], itm['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
+                                       (itm['codigo'], item['nombre'], item['cantidad'], item['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
                     conn.commit()
                     conn.close()
 
@@ -661,7 +661,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (ESTRUCTURA IDÉNTICA AL TICKET DE TALLER DE LA FOTO)
+    # VISTA PREVIA Y IMPRESIÓN (ANCHO DE 38 CARACTERES Y MÁRGENES PERFECTOS IDÉNTICOS AL TALLER)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -676,25 +676,25 @@ with tabs[0]:
                 f"        {cfg['direccion']}",
                 f"        Cel: {cfg['telefono']}",
                 f"==========================================",
-                f"TICKET DE VENTA",
-                f"FECHA: {fecha_actual_ticket}",
+                f" TICKET DE VENTA",
+                f" FECHA: {fecha_actual_ticket}",
                 f"------------------------------------------",
-                f"CLIENTE: {rg['cliente']}",
-                f"CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
+                f" CLIENTE: {rg['cliente']}",
+                f" CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
                 f"------------------------------------------",
-                f"CANT  PRODUCTO              TOTAL",
+                f" CANT  PRODUCTO              TOTAL",
                 f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f"{itm['cantidad']:<5} {itm['nombre'][:19]:<20} ${itm['total']:>10,.2f}")
+                lineas_ticket.append(f" {itm['cantidad']:<5} {itm['nombre'][:19]:<20} ${itm['total']:>10,.2f}")
             lineas_ticket.extend([
                 f"------------------------------------------",
-                f"TOTAL:              ${rg['subtotal']:>17,.2f}",
-                f"RECIBIDO:           ${rg['recibido']:>17,.2f}",
-                f"CAMBIO:             ${rg['vuelto']:>17,.2f}",
+                f" TOTAL:              ${rg['subtotal']:>17,.2f}",
+                f" RECIBIDO:           ${rg['recibido']:>17,.2f}",
+                f" CAMBIO:             ${rg['vuelto']:>17,.2f}",
                 f"==========================================",
-                f"IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
-                f"{cfg['garantia']}",
+                f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
+                f" {cfg['garantia']}",
                 f"------------------------------------------",
                 f"         ¡GRACIAS POR PREFERIRNOS!",
                 f"=========================================="
@@ -716,7 +716,7 @@ with tabs[0]:
                     fecha_impresion_real = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     ticket_impresion_final = ticket_limpio.replace(fecha_actual_ticket, fecha_impresion_real)
                     
-                    logo_html = f'<div style="text-align: center; margin-top: 10px; margin-bottom: 12px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 100px; height: 100px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
+                    logo_html = f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
                     components.html(f"""
                         <html>
                         <head>
@@ -733,7 +733,7 @@ with tabs[0]:
                                 height: auto !important;
                             }}
                             .print-wrapper {{
-                                width: 78mm;
+                                width: 75mm;
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
@@ -742,7 +742,7 @@ with tabs[0]:
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 13.5px; 
+                                font-size: 13px; 
                                 line-height: 1.3; 
                                 font-weight: bold; 
                                 white-space: pre; 
@@ -1204,7 +1204,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 78mm;
+                                    width: 75mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -1213,7 +1213,7 @@ if cfg['modo_taller'] == 1:
                                 .ticket-container {{ 
                                     text-align: left; 
                                     font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 13.5px; 
+                                    font-size: 13px; 
                                     line-height: 1.3; 
                                     font-weight: bold; 
                                     white-space: pre; 
@@ -1458,7 +1458,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 78mm;
+                                    width: 75mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -1467,7 +1467,7 @@ if cfg['modo_taller'] == 1:
                                 .ticket-container {{ 
                                     text-align: left; 
                                     font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 13.5px; 
+                                    font-size: 13px; 
                                     line-height: 1.3; 
                                     font-weight: bold; 
                                     white-space: pre; 
