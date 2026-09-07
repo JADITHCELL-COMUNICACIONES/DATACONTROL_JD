@@ -191,10 +191,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.28"
+VERSION_ACTUAL = "1.8.29"
 
-TAMANO_LETRA_IMPRESION = "13px"
-INTERLINEADO_IMPRESION = "1.3"
+TAMANO_LETRA_IMPRESION = "12px"
+INTERLINEADO_IMPRESION = "1.25"
 
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
@@ -661,7 +661,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL DE 78MM CON ESPACIADO INTERNO APRETADO PARA EVITAR CORTE DERECHO)
+    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL 78MM CON ESPACIADO INTERNO COMPACTO Y MONEDA PEGADA)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -682,16 +682,16 @@ with tabs[0]:
                 f" CLIENTE: {rg['cliente']}",
                 f" CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
                 f"------------------------------------------",
-                f" CANT PRODUCTO             TOTAL",
+                f"CANT PRODUCTO            TOTAL",
                 f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f" {itm['cantidad']:<4} {itm['nombre'][:18]:<19} ${itm['total']:>11,.2f}")
+                lineas_ticket.append(f"{itm['cantidad']:<3} {itm['nombre'][:17]:<18} ${itm['total']:>12,.2f}")
             lineas_ticket.extend([
                 f"------------------------------------------",
-                f" TOTAL:             ${rg['subtotal']:>18,.2f}",
-                f" RECIBIDO:          ${rg['recibido']:>18,.2f}",
-                f" CAMBIO:            ${rg['vuelto']:>18,.2f}",
+                f" TOTAL:            ${rg['subtotal']:>18,.2f}",
+                f" RECIBIDO:         ${rg['recibido']:>18,.2f}",
+                f" CAMBIO:           ${rg['vuelto']:>18,.2f}",
                 f"==========================================",
                 f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
                 f" {cfg['garantia']}",
@@ -747,7 +747,7 @@ with tabs[0]:
                                 font-weight: bold; 
                                 white-space: pre; 
                                 display: inline-block;
-                                letter-spacing: -0.2px;
+                                letter-spacing: -0.4px;
                             }}
                         </style>
                         </head>
@@ -1219,7 +1219,7 @@ if cfg['modo_taller'] == 1:
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
-                                    letter-spacing: -0.2px;
+                                    letter-spacing: -0.4px;
                                 }}
                             </style>
                             </head>
@@ -1474,7 +1474,7 @@ if cfg['modo_taller'] == 1:
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
-                                    letter-spacing: -0.2px;
+                                    letter-spacing: -0.4px;
                                 }}
                             </style>
                             </head>
@@ -1613,5 +1613,5 @@ with tabs[-1]:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- BARRA 인FERIOR DE LICENCIA ---
+# --- BARRA INFERIOR DE LICENCIA ---
 st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
