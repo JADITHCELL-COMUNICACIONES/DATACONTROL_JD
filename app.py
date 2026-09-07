@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 import shutil
 import base64
 from PIL import Image, ImageDraw, ImageFont
+import io
 
 
 # --- COMPONENTE DE PATRÓN SEGURO ---
@@ -191,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.29"
+VERSION_ACTUAL = "1.8.30"
 
 TAMANO_LETRA_IMPRESION = "12px"
 INTERLINEADO_IMPRESION = "1.25"
@@ -661,7 +662,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL 78MM CON ESPACIADO INTERNO COMPACTO Y MONEDA PEGADA)
+    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL 78MM CON NOMBRES DE 15 CARACTERES Y MONEDA SEGURA)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -682,11 +683,11 @@ with tabs[0]:
                 f" CLIENTE: {rg['cliente']}",
                 f" CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
                 f"------------------------------------------",
-                f"CANT PRODUCTO            TOTAL",
+                f"CANT PRODUCTO         TOTAL",
                 f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f"{itm['cantidad']:<3} {itm['nombre'][:17]:<18} ${itm['total']:>12,.2f}")
+                lineas_ticket.append(f"{itm['cantidad']:<2} {itm['nombre'][:15]:<16} ${itm['total']:>15,.2f}")
             lineas_ticket.extend([
                 f"------------------------------------------",
                 f" TOTAL:            ${rg['subtotal']:>18,.2f}",
@@ -765,7 +766,7 @@ with tabs[0]:
                     st.rerun()
 
 # =========================================================
-# 📦 PESTAÑA: INVENTARIO
+# 📦 PESTAÑA: INVENTARIO (CON FUNCIÓN DE EXPORTAR EN EXCEL)
 # =========================================================
 with tabs[1]:
     col_inv_izq, col_inv_der = st.columns([1, 2])
@@ -799,6 +800,30 @@ with tabs[1]:
         st.markdown("---")
         st.markdown('<div class="lbl-celeste">📂 Importar Archivo Excel (.xlsx):</div>', unsafe_allow_html=True)
         archivo_subido = st.file_uploader("Cargar archivo", type=["xlsx", "xls", "csv", "html", "htm"], key="uploader_inventario_general", label_visibility="collapsed")
+
+        # --- BOTÓN DE EXPORTAR INVENTARIO EN EXCEL ---
+        st.markdown("---")
+        st.markdown('<div class="lbl-celeste">📊 Exportar Inventario:</div>', unsafe_allow_html=True)
+        try:
+            conn_exp = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+            df_export = pd.read_sql("SELECT codigo as Código, nombre as Nombre, precio_compra as 'Precio Compra', precio_venta as 'Precio Venta', stock as Stock, proveedor as Proveedor, categoria as Categoría FROM productos ORDER BY categoria ASC, nombre ASC", conn_exp)
+            conn_exp.close()
+
+            if not df_export.empty:
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Inventario')
+                processed_data = output.getvalue()
+
+                st.download_button(
+                    label="📥 Descargar Inventario en Excel",
+                    data=processed_data,
+                    file_name=f"inventario_jadithcell_{obtener_tiempo_colombia().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.error(f"Error preparando exportación: {e}")
 
         conn_db = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
         cur_db = conn_db.cursor()
