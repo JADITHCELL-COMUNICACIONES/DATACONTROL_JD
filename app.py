@@ -191,7 +191,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.27"
+VERSION_ACTUAL = "1.8.28"
 
 TAMANO_LETRA_IMPRESION = "13px"
 INTERLINEADO_IMPRESION = "1.3"
@@ -619,7 +619,7 @@ with tabs[0]:
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
                         cursor.execute("INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (itm['codigo'], item['nombre'], item['cantidad'], item['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
+                                       (itm['codigo'], itm['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
                     conn.commit()
                     conn.close()
 
@@ -661,7 +661,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (ANCHO DE 38 CARACTERES Y MÁRGENES PERFECTOS IDÉNTICOS AL TALLER)
+    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL DE 78MM CON ESPACIADO INTERNO APRETADO PARA EVITAR CORTE DERECHO)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -682,16 +682,16 @@ with tabs[0]:
                 f" CLIENTE: {rg['cliente']}",
                 f" CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
                 f"------------------------------------------",
-                f" CANT  PRODUCTO              TOTAL",
+                f" CANT PRODUCTO             TOTAL",
                 f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f" {itm['cantidad']:<5} {itm['nombre'][:19]:<20} ${itm['total']:>10,.2f}")
+                lineas_ticket.append(f" {itm['cantidad']:<4} {itm['nombre'][:18]:<19} ${itm['total']:>11,.2f}")
             lineas_ticket.extend([
                 f"------------------------------------------",
-                f" TOTAL:              ${rg['subtotal']:>17,.2f}",
-                f" RECIBIDO:           ${rg['recibido']:>17,.2f}",
-                f" CAMBIO:             ${rg['vuelto']:>17,.2f}",
+                f" TOTAL:             ${rg['subtotal']:>18,.2f}",
+                f" RECIBIDO:          ${rg['recibido']:>18,.2f}",
+                f" CAMBIO:            ${rg['vuelto']:>18,.2f}",
                 f"==========================================",
                 f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
                 f" {cfg['garantia']}",
@@ -733,7 +733,7 @@ with tabs[0]:
                                 height: auto !important;
                             }}
                             .print-wrapper {{
-                                width: 75mm;
+                                width: 78mm;
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
@@ -743,10 +743,11 @@ with tabs[0]:
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
                                 font-size: 13px; 
-                                line-height: 1.3; 
+                                line-height: 1.25; 
                                 font-weight: bold; 
                                 white-space: pre; 
                                 display: inline-block;
+                                letter-spacing: -0.2px;
                             }}
                         </style>
                         </head>
@@ -1204,7 +1205,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 75mm;
+                                    width: 78mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -1218,6 +1219,7 @@ if cfg['modo_taller'] == 1:
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
+                                    letter-spacing: -0.2px;
                                 }}
                             </style>
                             </head>
@@ -1458,7 +1460,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 75mm;
+                                    width: 78mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -1472,6 +1474,7 @@ if cfg['modo_taller'] == 1:
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
+                                    letter-spacing: -0.2px;
                                 }}
                             </style>
                             </head>
@@ -1610,5 +1613,5 @@ with tabs[-1]:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- BARRA INFERIOR DE LICENCIA ---
+# --- BARRA 인FERIOR DE LICENCIA ---
 st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
