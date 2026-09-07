@@ -191,10 +191,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.6"
+VERSION_ACTUAL = "1.8.26"
 
-TAMANO_LETRA_IMPRESION = "16px"
-INTERLINEADO_IMPRESION = "1.35"
+TAMANO_LETRA_IMPRESION = "13.5px"
+INTERLINEADO_IMPRESION = "1.3"
 
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
@@ -258,7 +258,10 @@ st.markdown("""
         color: #ffffff !important;
         font-weight: bold !important;
         border: 1px solid #38bdf8 !important;
-        border-radius: 6px !important;
+        border-radius: 4px !important;
+        height: 30px !important;
+        font-size: 11px !important;
+        padding: 0px 4px !important;
     }
     div.stButton > button[kind="primary"] {
         background-color: #16a34a !important;
@@ -527,44 +530,51 @@ with tabs[0]:
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- TABLA DE CARRITO ESTILO POS INTEGRADA ---
+        st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+        st.markdown('<div class="lbl-celeste">🛒 DETALLE DE VENTA (CARRITO)</div>', unsafe_allow_html=True)
+        
         if st.session_state.carrito:
-            filas_tabla = []
-            for i, item in enumerate(st.session_state.carrito, 1):
-                filas_tabla.append({
-                    "#": i,
-                    "ID": item['id'],
-                    "Código": item['codigo'],
-                    "Producto": item['nombre'],
-                    "Cantidad": item['cantidad'],
-                    "Precio Unidad": f"${item['precio']:,.2f}",
-                    "Total": f"${item['total']:,.2f}"
-                })
-            df_carrito = pd.DataFrame(filas_tabla)
-            st.dataframe(df_carrito, use_container_width=True, hide_index=True)
+            c_h1, c_h2, c_h3, c_h4, c_h5, c_h6, c_h7 = st.columns([0.6, 1.8, 3.2, 1.0, 1.6, 1.6, 1.2])
+            with c_h1: st.markdown("<b style='font-size:11px; color:#94a3b8;'>#</b>", unsafe_allow_html=True)
+            with c_h2: st.markdown("<b style='font-size:11px; color:#94a3b8;'>CÓDIGO</b>", unsafe_allow_html=True)
+            with c_h3: st.markdown("<b style='font-size:11px; color:#94a3b8;'>PRODUCTO</b>", unsafe_allow_html=True)
+            with c_h4: st.markdown("<b style='font-size:11px; color:#94a3b8;'>CANT</b>", unsafe_allow_html=True)
+            with c_h5: st.markdown("<b style='font-size:11px; color:#94a3b8;'>PRECIO</b>", unsafe_allow_html=True)
+            with c_h6: st.markdown("<b style='font-size:11px; color:#94a3b8;'>TOTAL</b>", unsafe_allow_html=True)
+            with c_h7: st.markdown("<b style='font-size:11px; color:#94a3b8;'>ACCIONES</b>", unsafe_allow_html=True)
 
-            col_q1, col_q2, col_q3 = st.columns([1.2, 1.8, 2.5])
-            with col_q1:
-                item_a_quitar = st.number_input("Fila #", min_value=1, max_value=len(st.session_state.carrito), value=1, step=1, key="v_fila_quitar")
-            with col_q2:
-                st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-                if st.button("➖ Restar 1 Cantidad", key="v_btn_restar_1"):
-                    idx = item_a_quitar - 1
-                    if st.session_state.carrito[idx]['cantidad'] > 1:
-                        st.session_state.carrito[idx]['cantidad'] -= 1
-                        st.session_state.carrito[idx]['total'] = st.session_state.carrito[idx]['cantidad'] * st.session_state.carrito[idx]['precio']
-                    else:
-                        st.session_state.carrito.pop(idx)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-            with col_q3:
-                st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-                if st.button("❌ Quitar Ítem Completo", key="v_btn_del_item"):
-                    st.session_state.carrito.pop(item_a_quitar - 1)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 4px 0 8px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
+
+            for idx, item in enumerate(st.session_state.carrito):
+                r_c1, r_c2, r_c3, r_c4, r_c5, r_c6, r_c7 = st.columns([0.6, 1.8, 3.2, 1.0, 1.6, 1.6, 1.2])
+                with r_c1: st.markdown(f"<span style='font-size: 12px; color:#e2e8f0;'>{idx+1}</span>", unsafe_allow_html=True)
+                with r_c2: st.markdown(f"<span style='font-size: 12px; color:#38bdf8;'>{item['codigo']}</span>", unsafe_allow_html=True)
+                with r_c3: st.markdown(f"<span style='font-size: 12px; color:#ffffff;'><b>{item['nombre']}</b></span>", unsafe_allow_html=True)
+                with r_c4: st.markdown(f"<span style='font-size: 12px; color:#00ffcc;'><b>{item['cantidad']}</b></span>", unsafe_allow_html=True)
+                with r_c5: st.markdown(f"<span style='font-size: 12px; color:#e2e8f0;'>${item['precio']:,.0f}</span>", unsafe_allow_html=True)
+                with r_c6: st.markdown(f"<span style='font-size: 12px; color:#00ffcc;'><b>${item['total']:,.0f}</b></span>", unsafe_allow_html=True)
+                
+                with r_c7:
+                    sub_b1, sub_b2 = st.columns(2)
+                    with sub_b1:
+                        if st.button("➖", key=f"b_restar_{idx}", help="Restar 1 unidad"):
+                            if item['cantidad'] > 1:
+                                item['cantidad'] -= 1
+                                item['total'] = item['cantidad'] * item['precio']
+                            else:
+                                st.session_state.carrito.pop(idx)
+                            st.rerun()
+                    with sub_b2:
+                        if st.button("❌", key=f"b_quitar_{idx}", help="Quitar producto"):
+                            st.session_state.carrito.pop(idx)
+                            st.rerun()
+                st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         else:
-            df_vacio = pd.DataFrame(columns=["#", "ID", "Código", "Producto", "Cantidad", "Precio Unidad", "Total"])
-            st.dataframe(df_vacio, use_container_width=True, hide_index=True)
+            st.info("El carrito de compras está vacío. Agregue productos arriba.")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
         st.markdown('<div class="lbl-celeste">Notas del pedido:</div>', unsafe_allow_html=True)
@@ -651,7 +661,7 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN
+    # VISTA PREVIA Y IMPRESIÓN (ESTRUCTURA IDÉNTICA AL TICKET DE TALLER DE LA FOTO)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -659,28 +669,35 @@ with tabs[0]:
             fecha_actual_ticket = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             
             lineas_ticket = [
-                f"{cfg['empresa']}",
-                f"{cfg['propietario']}",
-                f"NIT: {cfg['nit']} | Tel: {cfg['telefono']}",
-                f"{cfg['direccion']}",
-                "-" * 38,
+                f"==========================================",
+                f"        {cfg['empresa']}",
+                f"       {cfg['propietario']}",
+                f"       NIT / CC: {cfg['nit']}",
+                f"        {cfg['direccion']}",
+                f"        Cel: {cfg['telefono']}",
+                f"==========================================",
+                f"TICKET DE VENTA",
                 f"FECHA: {fecha_actual_ticket}",
-                f"CLIENTE: {rg['cliente']} (CC: {rg['cedula']})",
-                "-" * 38,
-                f"{'Cant':<5}{'Producto':<21}{'Total':>12}",
-                "-" * 38
+                f"------------------------------------------",
+                f"CLIENTE: {rg['cliente']}",
+                f"CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
+                f"------------------------------------------",
+                f"CANT  PRODUCTO              TOTAL",
+                f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f"{itm['cantidad']:<5}{itm['nombre'][:20]:<21}${itm['total']:>11,.0f}")
+                lineas_ticket.append(f"{itm['cantidad']:<5} {itm['nombre'][:19]:<20} ${itm['total']:>10,.2f}")
             lineas_ticket.extend([
-                "-" * 38,
-                f"TOTAL: ${rg['subtotal']:,.2f}",
-                f"RECIBIDO: ${rg['recibido']:,.2f}",
-                f"CAMBIO: ${rg['vuelto']:,.2f}",
-                "-" * 38,
+                f"------------------------------------------",
+                f"TOTAL:              ${rg['subtotal']:>17,.2f}",
+                f"RECIBIDO:           ${rg['recibido']:>17,.2f}",
+                f"CAMBIO:             ${rg['vuelto']:>17,.2f}",
+                f"==========================================",
                 f"IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
-                cfg['garantia'],
-                "¡GRACIAS POR SU COMPRA!"
+                f"{cfg['garantia']}",
+                f"------------------------------------------",
+                f"         ¡GRACIAS POR PREFERIRNOS!",
+                f"=========================================="
             ])
             ticket_limpio = "\n".join([l for l in lineas_ticket if l is not None and l != ""])
             st.text_area("Ticket POS Venta", value=ticket_limpio.strip(), height=260, disabled=True, key="v_txt_ticket_pos_venta")
@@ -699,17 +716,42 @@ with tabs[0]:
                     fecha_impresion_real = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     ticket_impresion_final = ticket_limpio.replace(fecha_actual_ticket, fecha_impresion_real)
                     
-                    logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
+                    logo_html = f'<div style="text-align: center; margin-top: 10px; margin-bottom: 12px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 100px; height: 100px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
                     components.html(f"""
                         <html>
                         <head>
                         <style>
-                            body {{ margin: 0; padding: 0; text-align: center; }}
-                            .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                            @page {{
+                                size: 80mm auto;
+                                margin: 0;
+                            }}
+                            html, body {{
+                                margin: 0;
+                                padding: 0;
+                                width: 80mm;
+                                background-color: #ffffff;
+                                height: auto !important;
+                            }}
+                            .print-wrapper {{
+                                width: 78mm;
+                                margin: 0 auto;
+                                text-align: center;
+                                height: auto !important;
+                                padding-bottom: 2mm;
+                            }}
+                            .ticket-container {{ 
+                                text-align: left; 
+                                font-family: 'Courier New', Courier, monospace; 
+                                font-size: 13.5px; 
+                                line-height: 1.3; 
+                                font-weight: bold; 
+                                white-space: pre; 
+                                display: inline-block;
+                            }}
                         </style>
                         </head>
                         <body onload="window.print()">
-                            <div style="width: 100%; text-align: center;">
+                            <div class="print-wrapper">
                                 {logo_html}
                                 <div class="ticket-container">{ticket_impresion_final}</div>
                             </div>
@@ -910,7 +952,7 @@ if cfg['modo_taller'] == 1:
             st.caption(f"Secuencia actual: {secuencia or '—'}")
             return secuencia
 
-        # Pad de firma automático que actualiza la base64 mientras el usuario dibuja trazo a trazo
+        # Pad de firma automático (idéntico al funcionamiento del patrón)
         def renderizar_pad_firma(secuencia_actual):
             sec_inicial = str(secuencia_actual or "")
             secuencia = signature_pad_component(
@@ -1130,9 +1172,8 @@ if cfg['modo_taller'] == 1:
                 col_imp1, col_imp2 = st.columns(2)
                 with col_imp1:
                     if st.button("🖨️ Imprimir Recibo de Orden", type="primary", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
-                        logo_html = f'<img src="data:image/png;base64,{logo_base64_str}" style="max-width: 90px; display: block; margin: 0 auto 10px auto;" />' if logo_base64_str else ''
+                        logo_html = f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
                         
-                        # Extracción directa desde la base de datos
                         conn_f = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                         cur_f = conn_f.cursor()
                         cur_f.execute("SELECT firma_path FROM ordenes_servicio WHERE id = ?", (rt['id'],))
@@ -1143,7 +1184,7 @@ if cfg['modo_taller'] == 1:
                         
                         firma_html = ""
                         if firma_url_final and str(firma_url_final).startswith('data:image'):
-                            firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_url_final}" style="max-width: 140px; height: auto; border-bottom: 1px solid #000;" /></div>'
+                            firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_url_final}" style="max-width: 130px; height: auto; border-bottom: 1px solid #000;" /></div>'
 
                         cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
@@ -1151,12 +1192,37 @@ if cfg['modo_taller'] == 1:
                             <html>
                             <head>
                             <style>
-                                body {{ margin: 0; padding: 0; text-align: center; }}
-                                .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                                @page {{
+                                    size: 80mm auto;
+                                    margin: 0;
+                                }}
+                                html, body {{
+                                    margin: 0;
+                                    padding: 0;
+                                    width: 80mm;
+                                    background-color: #ffffff;
+                                    height: auto !important;
+                                }}
+                                .print-wrapper {{
+                                    width: 78mm;
+                                    margin: 0 auto;
+                                    text-align: center;
+                                    height: auto !important;
+                                    padding-bottom: 2mm;
+                                }}
+                                .ticket-container {{ 
+                                    text-align: left; 
+                                    font-family: 'Courier New', Courier, monospace; 
+                                    font-size: 13.5px; 
+                                    line-height: 1.3; 
+                                    font-weight: bold; 
+                                    white-space: pre; 
+                                    display: inline-block;
+                                }}
                             </style>
                             </head>
                             <body onload="window.print()">
-                                <div style="width: 100%; text-align: center;">
+                                <div class="print-wrapper">
                                     {logo_html}
                                     <div class="ticket-container">{ticket_cliente_impresion}</div>
                                     {firma_html}
@@ -1339,8 +1405,7 @@ if cfg['modo_taller'] == 1:
                             except Exception:
                                 logo_copia_base64 = ""
                         logo_copia_html = (
-                            f'<img src="data:image/png;base64,{logo_copia_base64}" '
-                            'style="max-width: 110px; display: block; margin: 0 auto 10px auto;" />'
+                            f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_copia_base64}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>'
                             if logo_copia_base64 else ""
                         )
                         ticket_copia_cliente = f"""
@@ -1370,27 +1435,52 @@ if cfg['modo_taller'] == 1:
 ------------------------------------------
 """.strip()
                         
-                        firma_copia_html = ""
                         firma_bd_url = ord_data[14] if len(ord_data) > 14 and ord_data[14] else ""
+                        firma_html = ""
                         if firma_bd_url and str(firma_bd_url).startswith('data:image'):
-                            firma_copia_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_bd_url}" style="max-width: 140px; height: auto; border-bottom: 1px solid #000;" /></div>'
+                            firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_bd_url}" style="max-width: 130px; height: auto; border-bottom: 1px solid #000;" /></div>'
 
-                        cierre_copia_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
                             <head>
                             <style>
-                                body {{ margin: 0; padding: 0; text-align: center; }}
-                                .ticket-container {{ display: inline-block; text-align: left; font-family: monospace; font-size: {TAMANO_LETRA_IMPRESION}; line-height: {INTERLINEADO_IMPRESION}; font-weight: 600; white-space: pre-wrap; margin: 0 auto; }}
+                                @page {{
+                                    size: 80mm auto;
+                                    margin: 0;
+                                }}
+                                html, body {{
+                                    margin: 0;
+                                    padding: 0;
+                                    width: 80mm;
+                                    background-color: #ffffff;
+                                    height: auto !important;
+                                }}
+                                .print-wrapper {{
+                                    width: 78mm;
+                                    margin: 0 auto;
+                                    text-align: center;
+                                    height: auto !important;
+                                    padding-bottom: 2mm;
+                                }}
+                                .ticket-container {{ 
+                                    text-align: left; 
+                                    font-family: 'Courier New', Courier, monospace; 
+                                    font-size: 13.5px; 
+                                    line-height: 1.3; 
+                                    font-weight: bold; 
+                                    white-space: pre; 
+                                    display: inline-block;
+                                }}
                             </style>
                             </head>
                             <body onload="window.print()">
-                                <div style="width: 100%; text-align: center;">
+                                <div class="print-wrapper">
                                     {logo_copia_html}
                                     <div class="ticket-container">{ticket_copia_cliente}</div>
-                                    {firma_copia_html}
-                                    {cierre_copia_html}
+                                    {firma_html}
+                                    {cierre_html}
                                 </div>
                             </body>
                             </html>
@@ -1418,7 +1508,7 @@ with tabs[-1]:
     c_gar = st.text_input("Garantía (Ventas)", value=cfg['garantia'], key="cfg_gar")
     c_gart = st.text_input("Garantía (Taller)", value=cfg['garantia_taller'], key="cfg_gart")
 
-    modo_taller_val = st.checkbox("🛠️ Habilitar Módulo de Órdenes de Servicio (Taller)", value=True if cfg['modo_taller'] == 1 else False, key="cfg_modo_taller_chk")
+    modo_t_val = st.checkbox("🛠️ Habilitar Módulo de Órdenes de Servicio (Taller)", value=True if cfg['modo_taller'] == 1 else False, key="cfg_modo_taller_chk")
 
     st.markdown("##### 🖼️ Logotipo del Negocio (Formato PNG)")
     logo_subido = st.file_uploader("Subir logotipo en PNG", type=["png", "jpg"], key="cfg_logo_uploader")
@@ -1432,7 +1522,7 @@ with tabs[-1]:
         st.success("¡Logotipo cargado y guardado con éxito!")
 
     if st.button("💾 Guardar Configuración", key="cfg_btn_save"):
-        val_taller_int = 1 if modo_taller_val else 0
+        val_taller_int = 1 if modo_t_val else 0
         conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
         cursor = conn.cursor()
         cursor.execute("UPDATE configuracion SET nombre_empresa=?, propietario=?, nit=?, direccion=?, telefono=?, garantia_dias=?, garantia_taller=?, logo_path=?, modo_taller=? WHERE id=1",
@@ -1489,15 +1579,15 @@ with tabs[-1]:
     st.markdown("---")
     st.markdown("##### ⚠️ ZONA DE PELIGRO")
     
-    if st.button("🗑️ Eliminar Todo el Inventario", type="secondary", key="btn_trigger_del"):
+    if st.button("🗑️ Eliminar Todo el Inventario", key="btn_trigger_del"):
         st.session_state.confirmar_borrado_inv = True
 
     if st.session_state.confirmar_borrado_inv:
-        st.warning("Estás a punto de borrar todo el inventario actual.")
-        pass_ingresada = st.text_input("Ingrese la contraseña maestra:", type="password", key="pass_del_inv")
+        st.warning("Estás a punto de borrar todo el inventario actual. Inserta la contraseña maestra para confirmar:")
+        pass_ingresada = st.text_input("Contraseña maestra:", type="password", key="pass_del_inv")
         
-        col_d1, col_d2 = st.columns(2)
-        with col_d1:
+        c_d1, c_d2 = st.columns(2)
+        with c_d1:
             if st.button("Confirmar Borrado Total", key="btn_confirm_del"):
                 if pass_ingresada == "JADITHCELL COMUNICACIONES":
                     try:
@@ -1513,7 +1603,7 @@ with tabs[-1]:
                         st.error(f"Error al borrar inventario: {ex}")
                 else:
                     st.error("Contraseña incorrecta.")
-        with col_d2:
+        with c_d2:
             if st.button("Cancelar", key="btn_cancel_del"):
                 st.session_state.confirmar_borrado_inv = False
                 st.rerun()
