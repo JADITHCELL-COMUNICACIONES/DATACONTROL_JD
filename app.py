@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.55"
+VERSION_ACTUAL = "1.8.61"
 
 TAMANO_LETRA_IMPRESION = "14px"
 INTERLINEADO_IMPRESION = "1.35"
@@ -440,13 +440,12 @@ if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia =
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
-fc = st.session_state.form_counter
-
-# Inicializamos llaves en session_state para controlar los inputs de texto directamente
-if f"t_ced_{fc}" not in st.session_state: st.session_state[f"t_ced_{fc}"] = ""
-if f"t_cli_{fc}" not in st.session_state: st.session_state[f"t_cli_{fc}"] = ""
-if f"t_tel_{fc}" not in st.session_state: st.session_state[f"t_tel_{fc}"] = ""
-if f"t_dir_{fc}" not in st.session_state: st.session_state[f"t_dir_{fc}"] = ""
+# INICIALIZACIÓN GLOBAL OBLIGATORIA DE LAS VARIABLES DE ESTADO
+if 'pre_cedula' not in st.session_state: st.session_state.pre_cedula = ""
+if 'pre_nombre' not in st.session_state: st.session_state.pre_nombre = ""
+if 'pre_telefono' not in st.session_state: st.session_state.pre_telefono = ""
+if 'pre_direccion' not in st.session_state: st.session_state.pre_direccion = ""
+if 'mapa_clientes_dict' not in st.session_state: st.session_state.mapa_clientes_dict = {}
 
 st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
 
@@ -974,7 +973,7 @@ with tabs[1]:
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (AUTORRELLENO DIRECTO BLINDADO)
+# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (CALLBACK DE AUTOCOMPLETADO SEGURO)
 # =========================================================
 if cfg['modo_taller'] == 1:
     with tabs[2]:
@@ -995,6 +994,21 @@ if cfg['modo_taller'] == 1:
         except:
             clientes_registrados = []
         conn_cli.close()
+
+        # Construimos el diccionario de mapeo en session_state para el callback
+        mapa_clientes = {}
+        opciones_clientes = ["-- Seleccionar cliente existente --"]
+        for c in clientes_registrados:
+            txt_opcion = f"{c[0]} — CC: {c[1]} — Tel: {c[2]}"
+            opciones_clientes.append(txt_opcion)
+            mapa_clientes[txt_opcion] = {
+                "nombre": str(c[0]) if c[0] else "",
+                "cedula": str(c[1]) if c[1] else "",
+                "telefono": str(c[2]) if c[2] else "",
+                "direccion": str(c[3]) if c[3] else ""
+            }
+
+        st.session_state.mapa_clientes_dict = mapa_clientes
 
         # Lienzo interactivo real para patrón
         def renderizar_lienzo_patron(secuencia_actual):
@@ -1026,49 +1040,44 @@ if cfg['modo_taller'] == 1:
 
         fc = st.session_state.form_counter
 
-        # --- SELECTOR CON CARGA DIRECTA VÍA SESSION_STATE ---
+        # --- FUNCIÓN DE CALLBACK PARA ACTUALIZAR AL SELECCIONAR CLIENTE ---
+        def al_seleccionar_cliente():
+            seleccion = st.session_state.get(f"select_cli_directo_{fc}", "-- Seleccionar cliente existente --")
+            diccionario = st.session_state.get("mapa_clientes_dict", {})
+            if seleccion in diccionario:
+                datos = diccionario[seleccion]
+                st.session_state.pre_nombre = datos["nombre"]
+                st.session_state.pre_cedula = datos["cedula"]
+                st.session_state.pre_telefono = datos["telefono"]
+                st.session_state.pre_direccion = datos["direccion"]
+            else:
+                st.session_state.pre_nombre = ""
+                st.session_state.pre_cedula = ""
+                st.session_state.pre_telefono = ""
+                st.session_state.pre_direccion = ""
+
+        # --- SELECTOR DE CLIENTES FRECUENTES CON ON_CHANGE ---
         if clientes_registrados:
             st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
-            st.markdown("<div class='lbl-celeste'>🔍 Seleccionar Cliente Frecuente:</div>", unsafe_allow_html=True)
+            st.markdown("<div class='lbl-celeste'>🔍 Seleccionar Cliente Frecuente (Autocompletar automático):</div>", unsafe_allow_html=True)
             
-            opciones_clientes = ["-- Seleccionar cliente existente --"] + [f"{c[0]} — CC: {c[1]} — Tel: {c[2]}" for c in clientes_registrados]
-            
-            sel_col1, sel_col2 = st.columns([3, 1])
-            with sel_col1:
-                cliente_seleccionado_dropdown = st.selectbox(
-                    "Seleccionar cliente",
-                    options=opciones_clientes,
-                    key=f"select_cli_directo_{fc}",
-                    label_visibility="collapsed"
-                )
-            with sel_col2:
-                btn_cargar_datos_cli = st.button("📥 Cargar Datos", key=f"btn_cargar_datos_{fc}", use_container_width=True)
-
-            if btn_cargar_datos_cli:
-                if cliente_seleccionado_dropdown != "-- Seleccionar cliente existente --":
-                    for c in clientes_registrados:
-                        txt_comparacion = f"{c[0]} — CC: {c[1]} — Tel: {c[2]}"
-                        if txt_comparacion == cliente_seleccionado_dropdown:
-                            st.session_state[f"t_ced_{fc}"] = str(c[1]) if c[1] else ""
-                            st.session_state[f"t_cli_{fc}"] = str(c[0]) if c[0] else ""
-                            st.session_state[f"t_tel_{fc}"] = str(c[2]) if c[2] else ""
-                            st.session_state[f"t_dir_{fc}"] = str(c[3]) if c[3] else ""
-                            break
-                    st.success("¡Datos del cliente cargados con éxito!")
-                    st.rerun()
-                else:
-                    st.warning("Por favor, seleccione un cliente válido de la lista.")
-
+            st.selectbox(
+                "Seleccionar cliente",
+                options=opciones_clientes,
+                key=f"select_cli_directo_{fc}",
+                on_change=al_seleccionar_cliente,
+                label_visibility="collapsed"
+            )
             st.markdown('</div>', unsafe_allow_html=True)
 
         col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
         
         with col_b1:
             st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-            ot_cedula = st.text_input("Cédula / NIT", placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
-            ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
-            ot_tel = st.text_input("Teléfono *", placeholder="* Teléfono", key=f"t_tel_{fc}")
-            ot_dir = st.text_input("Dirección", placeholder="Dirección", key=f"t_dir_{fc}")
+            ot_cedula = st.text_input("Cédula / NIT", value=st.session_state.pre_cedula, placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
+            ot_cliente = st.text_input("Nombre del cliente *", value=st.session_state.pre_nombre, placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
+            ot_tel = st.text_input("Teléfono *", value=st.session_state.pre_telefono, placeholder="* Teléfono", key=f"t_tel_{fc}")
+            ot_dir = st.text_input("Dirección", value=st.session_state.pre_direccion, placeholder="Dirección", key=f"t_dir_{fc}")
 
         with col_b2:
             st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
@@ -1143,13 +1152,19 @@ if cfg['modo_taller'] == 1:
                 val_costo = limpiar_monto(ot_costo_str)
                 val_abono = limpiar_monto(ot_abono_str)
 
-                if ot_cliente and ot_equipo and ot_falla:
+                # Tomamos los valores directamente de los inputs actualizados en pantalla
+                cli_val_final = st.session_state.get(f"t_cli_{fc}", ot_cliente)
+                ced_val_final = st.session_state.get(f"t_ced_{fc}", ot_cedula)
+                tel_val_final = st.session_state.get(f"t_tel_{fc}", ot_tel)
+                dir_val_final = st.session_state.get(f"t_dir_{fc}", ot_dir)
+
+                if cli_val_final and ot_equipo and ot_falla:
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
+                                   (cli_val_final, ced_val_final, tel_val_final, dir_val_final, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
                     conn.commit()
                     
                     cursor.execute("SELECT last_insert_rowid()")
@@ -1160,14 +1175,14 @@ if cfg['modo_taller'] == 1:
                     
                     st.session_state.patron_secuencia = ""
                     st.session_state.firma_secuencia = ""
-                    st.session_state[f"t_ced_{fc}"] = ""
-                    st.session_state[f"t_cli_{fc}"] = ""
-                    st.session_state[f"t_tel_{fc}"] = ""
-                    st.session_state[f"t_dir_{fc}"] = ""
+                    st.session_state.pre_cedula = ""
+                    st.session_state.pre_nombre = ""
+                    st.session_state.pre_telefono = ""
+                    st.session_state.pre_direccion = ""
                     st.session_state.form_counter += 1
                     
                     st.session_state.recibo_taller = {
-                        "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
+                        "id": nueva_id, "cliente": cli_val_final, "cedula": ced_val_final, "telefono": tel_val_final,
                         "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
                         "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
                         "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
@@ -1637,7 +1652,7 @@ with tabs[-1]:
     
     st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
     st.markdown("##### 🟩 Estado de la Licencia")
-    st.info("**Licencia Profesional Activa** — Quedan **336 días** restantes de servicio ininterrumpido.")
+    st.info("**Licencia Profesional Activa** — Quedan **336 días** restantes de servicio ininterrupido.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     c_empresa = st.text_input("Nombre de la Empresa", value=cfg['empresa'], key="cfg_emp")
