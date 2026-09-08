@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.42"
+VERSION_ACTUAL = "1.8.55"
 
 TAMANO_LETRA_IMPRESION = "14px"
 INTERLINEADO_IMPRESION = "1.35"
@@ -440,6 +440,14 @@ if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia =
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
+fc = st.session_state.form_counter
+
+# Inicializamos llaves en session_state para controlar los inputs de texto directamente
+if f"t_ced_{fc}" not in st.session_state: st.session_state[f"t_ced_{fc}"] = ""
+if f"t_cli_{fc}" not in st.session_state: st.session_state[f"t_cli_{fc}"] = ""
+if f"t_tel_{fc}" not in st.session_state: st.session_state[f"t_tel_{fc}"] = ""
+if f"t_dir_{fc}" not in st.session_state: st.session_state[f"t_dir_{fc}"] = ""
+
 st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
 
 tabs_labels = ["🛒 Módulo de Ventas", "📦 Inventario"]
@@ -451,7 +459,7 @@ tabs_labels.append("⚙️ Configuración Negocio")
 tabs = st.tabs(tabs_labels)
 
 # =========================================================
-# 🛒 MÓDULO DE VENTAS (CON EDICIÓN DE PRECIO EN CARRITO)
+# 🛒 MÓDULO DE VENTAS
 # =========================================================
 with tabs[0]:
     if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
@@ -559,7 +567,6 @@ with tabs[0]:
                 with r_c3: st.markdown(f"<span style='font-size: 12px; color:#ffffff; padding-top:8px; display:inline-block;'><b>{item['nombre']}</b></span>", unsafe_allow_html=True)
                 with r_c4: st.markdown(f"<span style='font-size: 12px; color:#00ffcc; padding-top:8px; display:inline-block;'><b>{item['cantidad']}</b></span>", unsafe_allow_html=True)
                 
-                # CAMPO DE PRECIO EDITABLE EN TIEMPO REAL
                 with r_c5:
                     nuevo_precio_input = st.number_input(
                         "Precio", 
@@ -681,7 +688,6 @@ with tabs[0]:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # VISTA PREVIA Y IMPRESIÓN (MARCO ORIGINAL 78MM CON NOMBRES DE 15 CARACTERES Y MONEDA SEGURA)
     if st.session_state.recibo_generado:
         rg = st.session_state.recibo_generado
 
@@ -785,7 +791,7 @@ with tabs[0]:
                     st.rerun()
 
 # =========================================================
-# 📦 PESTAÑA: INVENTARIO (CON FUNCIÓN DE EXPORTAR EN EXCEL)
+# 📦 PESTAÑA: INVENTARIO
 # =========================================================
 with tabs[1]:
     col_inv_izq, col_inv_der = st.columns([1, 2])
@@ -820,7 +826,6 @@ with tabs[1]:
         st.markdown('<div class="lbl-celeste">📂 Importar Archivo Excel (.xlsx):</div>', unsafe_allow_html=True)
         archivo_subido = st.file_uploader("Cargar archivo", type=["xlsx", "xls", "csv", "html", "htm"], key="uploader_inventario_general", label_visibility="collapsed")
 
-        # --- BOTÓN DE EXPORTAR INVENTARIO EN EXCEL ---
         st.markdown("---")
         st.markdown('<div class="lbl-celeste">📊 Exportar Inventario:</div>', unsafe_allow_html=True)
         try:
@@ -969,7 +974,7 @@ with tabs[1]:
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (CON FALLA AMPLIADA)
+# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (AUTORRELLENO DIRECTO BLINDADO)
 # =========================================================
 if cfg['modo_taller'] == 1:
     with tabs[2]:
@@ -981,6 +986,16 @@ if cfg['modo_taller'] == 1:
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
         st.subheader("➕ Registrar Nueva Orden de Servicio")
         
+        # Cargar base de datos de clientes previos desde SQLite
+        conn_cli = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+        cur_cli = conn_cli.cursor()
+        try:
+            cur_cli.execute("SELECT DISTINCT cliente, cedula, telefono, direccion FROM ordenes_servicio WHERE cliente IS NOT NULL AND cliente != '' ORDER BY id DESC")
+            clientes_registrados = cur_cli.fetchall()
+        except:
+            clientes_registrados = []
+        conn_cli.close()
+
         # Lienzo interactivo real para patrón
         def renderizar_lienzo_patron(secuencia_actual):
             secuencia_inicial = "".join(
@@ -1011,12 +1026,47 @@ if cfg['modo_taller'] == 1:
 
         fc = st.session_state.form_counter
 
+        # --- SELECTOR CON CARGA DIRECTA VÍA SESSION_STATE ---
+        if clientes_registrados:
+            st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+            st.markdown("<div class='lbl-celeste'>🔍 Seleccionar Cliente Frecuente:</div>", unsafe_allow_html=True)
+            
+            opciones_clientes = ["-- Seleccionar cliente existente --"] + [f"{c[0]} — CC: {c[1]} — Tel: {c[2]}" for c in clientes_registrados]
+            
+            sel_col1, sel_col2 = st.columns([3, 1])
+            with sel_col1:
+                cliente_seleccionado_dropdown = st.selectbox(
+                    "Seleccionar cliente",
+                    options=opciones_clientes,
+                    key=f"select_cli_directo_{fc}",
+                    label_visibility="collapsed"
+                )
+            with sel_col2:
+                btn_cargar_datos_cli = st.button("📥 Cargar Datos", key=f"btn_cargar_datos_{fc}", use_container_width=True)
+
+            if btn_cargar_datos_cli:
+                if cliente_seleccionado_dropdown != "-- Seleccionar cliente existente --":
+                    for c in clientes_registrados:
+                        txt_comparacion = f"{c[0]} — CC: {c[1]} — Tel: {c[2]}"
+                        if txt_comparacion == cliente_seleccionado_dropdown:
+                            st.session_state[f"t_ced_{fc}"] = str(c[1]) if c[1] else ""
+                            st.session_state[f"t_cli_{fc}"] = str(c[0]) if c[0] else ""
+                            st.session_state[f"t_tel_{fc}"] = str(c[2]) if c[2] else ""
+                            st.session_state[f"t_dir_{fc}"] = str(c[3]) if c[3] else ""
+                            break
+                    st.success("¡Datos del cliente cargados con éxito!")
+                    st.rerun()
+                else:
+                    st.warning("Por favor, seleccione un cliente válido de la lista.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
         col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
         
         with col_b1:
             st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-            ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
             ot_cedula = st.text_input("Cédula / NIT", placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
+            ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
             ot_tel = st.text_input("Teléfono *", placeholder="* Teléfono", key=f"t_tel_{fc}")
             ot_dir = st.text_input("Dirección", placeholder="Dirección", key=f"t_dir_{fc}")
 
@@ -1110,6 +1160,10 @@ if cfg['modo_taller'] == 1:
                     
                     st.session_state.patron_secuencia = ""
                     st.session_state.firma_secuencia = ""
+                    st.session_state[f"t_ced_{fc}"] = ""
+                    st.session_state[f"t_cli_{fc}"] = ""
+                    st.session_state[f"t_tel_{fc}"] = ""
+                    st.session_state[f"t_dir_{fc}"] = ""
                     st.session_state.form_counter += 1
                     
                     st.session_state.recibo_taller = {
