@@ -192,10 +192,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.40"
+VERSION_ACTUAL = "1.8.41"
 
-TAMANO_LETRA_IMPRESION = "12px"
-INTERLINEADO_IMPRESION = "1.25"
+TAMANO_LETRA_IMPRESION = "14px"
+INTERLINEADO_IMPRESION = "1.35"
 
 def obtener_tiempo_colombia():
     return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
@@ -738,21 +738,21 @@ with tabs[0]:
                                 height: auto !important;
                             }}
                             .print-wrapper {{
-                                width: 78mm;
+                                width: 76mm;
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
-                                padding-bottom: 2mm;
+                                padding-bottom: 3mm;
                             }}
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 13px; 
-                                line-height: 1.25; 
+                                font-size: 14px; 
+                                line-height: 1.35; 
                                 font-weight: bold; 
                                 white-space: pre; 
                                 display: inline-block;
-                                letter-spacing: -0.4px;
+                                letter-spacing: -0.3px;
                             }}
                         </style>
                         </head>
@@ -1224,21 +1224,21 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 78mm;
+                                    width: 76mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 2mm;
+                                    padding-bottom: 3mm;
                                 }}
                                 .ticket-container {{ 
                                     text-align: left; 
                                     font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 13px; 
-                                    line-height: 1.3; 
+                                    font-size: 14px; 
+                                    line-height: 1.35; 
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
-                                    letter-spacing: -0.4px;
+                                    letter-spacing: -0.3px;
                                 }}
                             </style>
                             </head>
@@ -1528,21 +1528,21 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 78mm;
+                                    width: 76mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 2mm;
+                                    padding-bottom: 3mm;
                                 }}
                                 .ticket-container {{ 
                                     text-align: left; 
                                     font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 13px; 
-                                    line-height: 1.3; 
+                                    font-size: 14px; 
+                                    line-height: 1.35; 
                                     font-weight: bold; 
                                     white-space: pre; 
                                     display: inline-block;
-                                    letter-spacing: -0.4px;
+                                    letter-spacing: -0.3px;
                                 }}
                             </style>
                             </head>
