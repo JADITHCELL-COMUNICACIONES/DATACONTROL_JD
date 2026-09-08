@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.38"
+VERSION_ACTUAL = "1.8.40"
 
 TAMANO_LETRA_IMPRESION = "12px"
 INTERLINEADO_IMPRESION = "1.25"
@@ -297,14 +297,17 @@ if not st.session_state.autenticado:
     col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
     with col_l2:
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
-        usuario_ingresado = st.text_input("Usuario")
-        password_ingresado = st.text_input("Contraseña", type="password")
-        if st.button("Ingresar al Sistema", type="primary", use_container_width=True):
-            if usuario_ingresado == "JADITHCELL" and password_ingresado == "19892026":
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos.")
+        with st.form(key="form_login"):
+            usuario_ingresado = st.text_input("Usuario", value="JADITHCELL")
+            password_ingresado = st.text_input("Contraseña", type="password", value="19892026")
+            btn_ingresar = st.form_submit_button("Ingresar al Sistema", type="primary", use_container_width=True)
+            
+            if btn_ingresar:
+                if usuario_ingresado == "JADITHCELL" and password_ingresado == "19892026":
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("Usuario o contraseña incorrectos.")
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 else:
@@ -1004,7 +1007,6 @@ if cfg['modo_taller'] == 1:
 
         with col_b2:
             st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
-            # CAMBIADO A TEXT_AREA AMPLIADO PARA MÚLTIPLES LÍNEAS DE FALLA
             ot_falla = st.text_area("Falla reportada *", placeholder="* Escriba la falla o descripción detallada...", height=68, key=f"t_fa_{fc}")
             ot_equipo = st.text_input("Modelo del equipo *", placeholder="* Modelo del equipo", key=f"t_eq_{fc}")
             ot_imei = st.text_input("IMEI / Serial", placeholder="IMEI / Serial", key=f"t_im_{fc}")
