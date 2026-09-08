@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.30"
+VERSION_ACTUAL = "1.8.37"
 
 TAMANO_LETRA_IMPRESION = "12px"
 INTERLINEADO_IMPRESION = "1.25"
@@ -441,7 +441,8 @@ st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
 
 tabs_labels = ["🛒 Módulo de Ventas", "📦 Inventario"]
 if cfg['modo_taller'] == 1:
-    tabs_labels.append("🛠️ Órdenes de Servicio (Taller)")
+    tabs_labels.append("➕ Crear Orden")
+    tabs_labels.append("🛠️ Servicios")
 tabs_labels.append("⚙️ Configuración Negocio")
 
 tabs = st.tabs(tabs_labels)
@@ -950,7 +951,7 @@ with tabs[1]:
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# 🛠️ PESTAÑA: ÓRDENES DE SERVICIO (TALLER)
+# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO
 # =========================================================
 if cfg['modo_taller'] == 1:
     with tabs[2]:
@@ -960,7 +961,7 @@ if cfg['modo_taller'] == 1:
                 st.image(cfg['logo_path'], width=120)
 
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
-        st.subheader("🛠️ Órdenes de Servicio y Ficha Técnica")
+        st.subheader("➕ Registrar Nueva Orden de Servicio")
         
         # Lienzo interactivo real para patrón
         def renderizar_lienzo_patron(secuencia_actual):
@@ -978,7 +979,7 @@ if cfg['modo_taller'] == 1:
             st.caption(f"Secuencia actual: {secuencia or '—'}")
             return secuencia
 
-        # Pad de firma automático (idéntico al funcionamiento del patrón)
+        # Pad de firma automático
         def renderizar_pad_firma(secuencia_actual):
             sec_inicial = str(secuencia_actual or "")
             secuencia = signature_pad_component(
@@ -992,130 +993,121 @@ if cfg['modo_taller'] == 1:
 
         fc = st.session_state.form_counter
 
-        with st.expander("📋 REGISTRAR ORDEN DE SERVICIO - JADITHCELL COMUNICACIONES", expanded=True):
-            col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
-            
-            with col_b1:
-                st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-                ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
-                ot_cedula = st.text_input("Cédula / NIT", placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
-                ot_tel = st.text_input("Teléfono *", placeholder="* Teléfono", key=f"t_tel_{fc}")
-                ot_dir = st.text_input("Dirección", placeholder="Dirección", key=f"t_dir_{fc}")
+        col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
+        
+        with col_b1:
+            st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
+            ot_cliente = st.text_input("Nombre del cliente *", placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
+            ot_cedula = st.text_input("Cédula / NIT", placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
+            ot_tel = st.text_input("Teléfono *", placeholder="* Teléfono", key=f"t_tel_{fc}")
+            ot_dir = st.text_input("Dirección", placeholder="Dirección", key=f"t_dir_{fc}")
 
-            with col_b2:
-                st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
-                ot_falla = st.text_input("Falla reportada *", placeholder="* Falla reportada", key=f"t_fa_{fc}")
-                ot_equipo = st.text_input("Modelo del equipo *", placeholder="* Modelo del equipo", key=f"t_eq_{fc}")
-                ot_imei = st.text_input("IMEI / Serial", placeholder="IMEI / Serial", key=f"t_im_{fc}")
-                st.markdown("<br>", unsafe_allow_html=True)
-
-            with col_b3:
-                st.markdown('<div class="lbl-amarillo">COSTOS Y SEGURIDAD</div>', unsafe_allow_html=True)
-                sub_c1, sub_c2 = st.columns(2)
-                with sub_c1:
-                    ot_costo_str = st.text_input("Precio", placeholder="Precio", key=f"t_cos_{fc}")
-                with sub_c2:
-                    ot_abono_str = st.text_input("Abono", placeholder="Abono", key=f"t_abo_{fc}")
-                
-                ot_patron_txt = st.text_input("Patrón, PIN o Contraseña", placeholder="Patrón, PIN o Contraseña", key=f"t_pat_{fc}")
-
-            st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
-            st.markdown("<div class='lbl-celeste'>🔐 Dibujar Patrón de Desbloqueo (Opcional)</div>", unsafe_allow_html=True)
-            patron_col_1, patron_col_2 = st.columns([3, 1])
-            with patron_col_1:
-                val_lienzo_canvas = renderizar_lienzo_patron(st.session_state.patron_secuencia)
-                if val_lienzo_canvas and isinstance(val_lienzo_canvas, str):
-                    st.session_state.patron_secuencia = val_lienzo_canvas
-            with patron_col_2:
-                if st.button("🧹 Limpiar Patrón", key=f"btn_limpiar_pat_{fc}", use_container_width=True):
-                    st.session_state.patron_secuencia = ""
-                    st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # --- PAD DE FIRMA DIGITAL AUTOMÁTICO (MULTITRAZO) ---
-            st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
-            st.markdown("<div class='lbl-celeste'>✍️ Firma del Cliente (Digital / Táctil / Mouse)</div>", unsafe_allow_html=True)
-            st.caption("Firme con tranquilidad trazo por trazo (puede levantar el dedo o mouse sin perder la firma):")
-            
-            firma_col_1, firma_col_2 = st.columns([3, 1])
-            with firma_col_1:
-                val_firma_canvas = renderizar_pad_firma(st.session_state.firma_secuencia)
-                if val_firma_canvas and isinstance(val_firma_canvas, str):
-                    st.session_state.firma_secuencia = val_firma_canvas
-            with firma_col_2:
-                if st.button("🧹 Limpiar Firma", key=f"btn_limpiar_firma_{fc}", use_container_width=True):
-                    st.session_state.firma_secuencia = ""
-                    st.rerun()
-
-            if st.session_state.firma_secuencia:
-                st.success("✓ Firma capturada correctamente")
-
-            ot_notas = st.text_input("Notas adicionales / Chequeo físico", placeholder="Notas adicionales / Chequeo físico", key=f"t_not_{fc}")
-            st.markdown('</div>', unsafe_allow_html=True)
-
+        with col_b2:
+            st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
+            ot_falla = st.text_input("Falla reportada *", placeholder="* Falla reportada", key=f"t_fa_{fc}")
+            ot_equipo = st.text_input("Modelo del equipo *", placeholder="* Modelo del equipo", key=f"t_eq_{fc}")
+            ot_imei = st.text_input("IMEI / Serial", placeholder="IMEI / Serial", key=f"t_im_{fc}")
             st.markdown("<br>", unsafe_allow_html=True)
-            col_btn_reg1, col_btn_reg2 = st.columns([4, 1])
-            with col_btn_reg1:
-                if st.button("💾 Guardar Orden", type="primary", use_container_width=True, key=f"t_btn_save_{fc}"):
-                    patron_guardar = ot_patron_txt.strip() if ot_patron_txt else st.session_state.patron_secuencia.strip()
-                    firma_guardar = st.session_state.firma_secuencia if isinstance(st.session_state.firma_secuencia, str) else ""
-                    
-                    def limpiar_monto(val_txt):
-                        if not val_txt: return 0.0
-                        try:
-                            limpio = str(val_txt).replace('$', '').strip()
-                            if '.' in limpio and ',' in limpio:
-                                limpio = limpio.replace('.', '').replace(',', '.')
-                            elif limpio.count('.') > 1:
-                                limpio = limpio.replace('.', '', limpio.count('.') - 1)
-                            elif ',' in limpio and '.' not in limpio:
-                                limpio = limpio.replace(',', '.')
-                            return float(limpio)
-                        except:
-                            return 0.0
 
-                    val_costo = limpiar_monto(ot_costo_str)
-                    val_abono = limpiar_monto(ot_abono_str)
-
-                    if ot_cliente and ot_equipo and ot_falla:
-                        conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
-                        cursor = conn.cursor()
-                        fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-                        cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
-                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                       (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
-                        conn.commit()
-                        
-                        cursor.execute("SELECT last_insert_rowid()")
-                        nueva_id = cursor.fetchone()[0]
-                        conn.close()
-
-                        st.success("¡Orden de servicio guardada con éxito!")
-                        
-                        st.session_state.patron_secuencia = ""
-                        st.session_state.firma_secuencia = ""
-                        st.session_state.form_counter += 1
-                        
-                        st.session_state.recibo_taller = {
-                            "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
-                            "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
-                            "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
-                            "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
-                        }
-                        st.rerun()
-                    else:
-                        st.error("Cliente, modelo del equipo y falla son requeridos.")
+        with col_b3:
+            st.markdown('<div class="lbl-amarillo">COSTOS Y SEGURIDAD</div>', unsafe_allow_html=True)
+            sub_c1, sub_c2 = st.columns(2)
+            with sub_c1:
+                ot_costo_str = st.text_input("Precio", placeholder="Precio", key=f"t_cos_{fc}")
+            with sub_c2:
+                ot_abono_str = st.text_input("Abono", placeholder="Abono", key=f"t_abo_{fc}")
             
-            with col_btn_reg2:
-                if st.button("🛠️ Ficha Técnica", use_container_width=True, key=f"btn_ficha_rapida_{fc}"):
+            ot_patron_txt = st.text_input("Patrón, PIN o Contraseña", placeholder="Patrón, PIN o Contraseña", key=f"t_pat_{fc}")
+
+        st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+        st.markdown("<div class='lbl-celeste'>🔐 Dibujar Patrón de Desbloqueo (Opcional)</div>", unsafe_allow_html=True)
+        patron_col_1, patron_col_2 = st.columns([3, 1])
+        with patron_col_1:
+            val_lienzo_canvas = renderizar_lienzo_patron(st.session_state.patron_secuencia)
+            if val_lienzo_canvas and isinstance(val_lienzo_canvas, str):
+                st.session_state.patron_secuencia = val_lienzo_canvas
+        with patron_col_2:
+            if st.button("🧹 Limpiar Patrón", key=f"btn_limpiar_pat_{fc}", use_container_width=True):
+                st.session_state.patron_secuencia = ""
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+        st.markdown("<div class='lbl-celeste'>✍️ Firma del Cliente (Digital / Táctil / Mouse)</div>", unsafe_allow_html=True)
+        st.caption("Firme con tranquilidad trazo por trazo (puede levantar el dedo o mouse sin perder la firma):")
+        
+        firma_col_1, firma_col_2 = st.columns([3, 1])
+        with firma_col_1:
+            val_firma_canvas = renderizar_pad_firma(st.session_state.firma_secuencia)
+            if val_firma_canvas and isinstance(val_firma_canvas, str):
+                st.session_state.firma_secuencia = val_firma_canvas
+        with firma_col_2:
+            if st.button("🧹 Limpiar Firma", key=f"btn_limpiar_firma_{fc}", use_container_width=True):
+                st.session_state.firma_secuencia = ""
+                st.rerun()
+
+        if st.session_state.firma_secuencia:
+            st.success("✓ Firma capturada correctamente")
+
+        ot_notas = st.text_input("Notas adicionales / Chequeo físico", placeholder="Notas adicionales / Chequeo físico", key=f"t_not_{fc}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_btn_reg1, col_btn_reg2 = st.columns([4, 1])
+        with col_btn_reg1:
+            if st.button("💾 Guardar Orden", type="primary", use_container_width=True, key=f"t_btn_save_{fc}"):
+                patron_guardar = ot_patron_txt.strip() if ot_patron_txt else st.session_state.patron_secuencia.strip()
+                firma_guardar = st.session_state.firma_secuencia if isinstance(st.session_state.firma_secuencia, str) else ""
+                
+                def limpiar_monto(val_txt):
+                    if not val_txt: return 0.0
+                    try:
+                        limpio = str(val_txt).replace('$', '').strip()
+                        if '.' in limpio and ',' in limpio:
+                            limpio = limpio.replace('.', '').replace(',', '.')
+                        elif limpio.count('.') > 1:
+                            limpio = limpio.replace('.', '', limpio.count('.') - 1)
+                        elif ',' in limpio and '.' not in limpio:
+                            limpio = limpio.replace(',', '.')
+                        return float(limpio)
+                    except:
+                        return 0.0
+
+                val_costo = limpiar_monto(ot_costo_str)
+                val_abono = limpiar_monto(ot_abono_str)
+
+                if ot_cliente and ot_equipo and ot_falla:
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
-                    cursor.execute("SELECT id FROM ordenes_servicio ORDER BY id DESC LIMIT 1")
-                    ultima_o = cursor.fetchone()
+                    fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                    cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
+                    conn.commit()
+                    
+                    cursor.execute("SELECT last_insert_rowid()")
+                    nueva_id = cursor.fetchone()[0]
                     conn.close()
-                    if ultima_o:
-                        st.session_state.ficha_orden_id = ultima_o[0]
-                        st.rerun()
+
+                    st.success("¡Orden de servicio guardada con éxito!")
+                    
+                    st.session_state.patron_secuencia = ""
+                    st.session_state.firma_secuencia = ""
+                    st.session_state.form_counter += 1
+                    
+                    st.session_state.recibo_taller = {
+                        "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
+                        "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
+                        "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
+                        "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
+                    }
+                    st.rerun()
+                else:
+                    st.error("Cliente, modelo del equipo y falla son requeridos.")
+        
+        with col_btn_reg2:
+            if st.button("🛠️ Ver Servicios", use_container_width=True, key=f"btn_ir_servicios_{fc}"):
+                st.rerun()
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
@@ -1263,31 +1255,80 @@ if cfg['modo_taller'] == 1:
                         st.session_state.recibo_taller = None
                         st.rerun()
 
-        st.markdown("---")
-        
-        col_sel_1, col_sel_2 = st.columns([3, 1])
-        with col_sel_1:
-            conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, cliente, equipo, falla, estado, fecha FROM ordenes_servicio ORDER BY id DESC")
-            todas_ordenes = cursor.fetchall()
-            conn.close()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            opciones_ord = {f"Orden #{o[0]:04d} — {o[1]} ({o[2]}) [Estado: {o[4]}]": o[0] for o in todas_ordenes} if todas_ordenes else {}
-            sel_orden_str = st.selectbox("Seleccione una orden de servicio:", options=list(opciones_ord.keys()) if opciones_ord else ["No hay órdenes registradas"])
+# =========================================================
+# 🛠️ PESTAÑA: SERVICIOS (GESTIÓN Y BANCO DE REPARACIÓN)
+# =========================================================
+if cfg['modo_taller'] == 1:
+    with tabs[3]:
+        if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
+            col_tlg1, col_tlg2, col_tlg3 = st.columns([2, 1, 2])
+            with col_tlg2:
+                st.image(cfg['logo_path'], width=120)
+
+        st.markdown('<div class="jd-card">', unsafe_allow_html=True)
+        st.subheader("🛠️ Gestión de Servicios y Órdenes Registradas")
         
-        with col_sel_2:
-            st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-            if st.button("🛠️ Ver Ficha Técnica", use_container_width=True):
-                if opciones_ord and sel_orden_str in opciones_ord:
-                    st.session_state.ficha_orden_id = opciones_ord[sel_orden_str]
-                    st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        # --- BÚSQUEDA Y PESTAÑAS CON SCROLL FIJO (ALTURA 320px) ---
+        f_col1, f_col2 = st.columns([2, 1])
+        with f_col1:
+            filtro_texto = st.text_input("Buscar por Número de Orden, Nombre o Cédula:", placeholder="Ej: 15, Juan Pérez, 12345678...", key="filtro_orden_servicios")
 
         conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
-        df_ordenes_tabla = pd.read_sql("SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, direccion as Dirección, equipo as Equipo, imei as IMEI, falla as Falla, costo as Costo, abono as Abono, estado as Estado, pin_patron as 'Pin/Patron', detalles_chequeo as Chequeo, fecha as Fecha FROM ordenes_servicio ORDER BY id DESC", conn)
+        query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
+        params = []
+
+        if filtro_texto:
+            query_base += " AND (id LIKE ? OR cliente LIKE ? OR cedula LIKE ?)"
+            params.extend([f"%{filtro_texto}%", f"%{filtro_texto}%", f"%{filtro_texto}%"])
+
+        query_base += " ORDER BY id DESC"
+        df_ordenes_tabla = pd.read_sql(query_base, conn, params=params)
         conn.close()
-        st.dataframe(df_ordenes_tabla, use_container_width=True, hide_index=True)
+
+        # Pestañas exclusivas por estado
+        tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
+
+        def mostrar_tabla_con_seleccion(df_sub, sufijo):
+            if df_sub.empty:
+                st.info("No hay órdenes en esta sección.")
+                return
+            
+            # Contenedor con scroll vertical fijo para evitar estirar la página
+            with st.container(height=320):
+                for _, row in df_sub.iterrows():
+                    col_row1, col_row2, col_row3, col_row4, col_row5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
+                    with col_row1: st.markdown(f"**#{row['ID']:04d}**")
+                    with col_row2: st.markdown(f"{row['Cliente']}")
+                    with col_row3: st.markdown(f"{row['Equipo']}")
+                    with col_row4: st.markdown(f"🟢 `{row['Estado']}`")
+                    with col_row5:
+                        if st.button("🛠️ Ver Ficha", key=f"btn_{sufijo}_{row['ID']}"):
+                            st.session_state.ficha_orden_id = row['ID']
+                            st.rerun()
+                    st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
+
+        with tab_proceso:
+            df_proc = df_ordenes_tabla[df_ordenes_tabla['Estado'].isin(["PENDIENTE", "EN REVISIÓN", "ESPERANDO REPUESTO", "SIN SOLUCIÓN"])]
+            mostrar_tabla_con_seleccion(df_proc, "proceso")
+
+        with tab_reparadas:
+            df_rep = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "REPARADO"]
+            mostrar_tabla_con_seleccion(df_rep, "reparadas")
+
+        with tab_entregadas:
+            df_ent = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "ENTREGADO"]
+            mostrar_tabla_con_seleccion(df_ent, "entregadas")
+
+        with tab_garantias:
+            df_gar = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "GARANTÍA"]
+            mostrar_tabla_con_seleccion(df_gar, "garantias")
+
+        with tab_todas:
+            mostrar_tabla_con_seleccion(df_ordenes_tabla, "todas")
+
+        st.markdown("---")
 
         # BANCO DE REPARACIÓN (FICHA TÉCNICA Y SEGURIDAD)
         if st.session_state.ficha_orden_id:
@@ -1375,7 +1416,7 @@ if cfg['modo_taller'] == 1:
                     
                     nuevo_patron_edit = st.text_input("Secuencia del Patrón / PIN", value=patron_guardado_bd, key=f"edit_pat_{oid}")
                     
-                    estados_pos = ["PENDIENTE", "EN REVISIÓN", "REPARADO", "ENTREGADO", "SIN SOLUCIÓN", "ESPERANDO REPUESTO"]
+                    estados_pos = ["PENDIENTE", "EN REVISIÓN", "REPARADO", "ENTREGADO", "GARANTÍA", "SIN SOLUCIÓN", "ESPERANDO REPUESTO"]
                     est_actual_idx = estados_pos.index(ord_data[10]) if ord_data[10] in estados_pos else 0
                     nuevo_estado_edit = st.selectbox("Estado Actual", options=estados_pos, index=est_actual_idx, key=f"edit_est_{oid}")
                     
@@ -1638,5 +1679,5 @@ with tabs[-1]:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- BARRA INFERIOR DE LICENCIA ---
+# --- BARRA INFERIOR/ESTADO ---
 st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
