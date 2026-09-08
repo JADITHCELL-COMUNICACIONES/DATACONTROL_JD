@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.37"
+VERSION_ACTUAL = "1.8.38"
 
 TAMANO_LETRA_IMPRESION = "12px"
 INTERLINEADO_IMPRESION = "1.25"
@@ -951,7 +951,7 @@ with tabs[1]:
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO
+# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (CON FALLA AMPLIADA)
 # =========================================================
 if cfg['modo_taller'] == 1:
     with tabs[2]:
@@ -1004,10 +1004,10 @@ if cfg['modo_taller'] == 1:
 
         with col_b2:
             st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
-            ot_falla = st.text_input("Falla reportada *", placeholder="* Falla reportada", key=f"t_fa_{fc}")
+            # CAMBIADO A TEXT_AREA AMPLIADO PARA MÚLTIPLES LÍNEAS DE FALLA
+            ot_falla = st.text_area("Falla reportada *", placeholder="* Escriba la falla o descripción detallada...", height=68, key=f"t_fa_{fc}")
             ot_equipo = st.text_input("Modelo del equipo *", placeholder="* Modelo del equipo", key=f"t_eq_{fc}")
             ot_imei = st.text_input("IMEI / Serial", placeholder="IMEI / Serial", key=f"t_im_{fc}")
-            st.markdown("<br>", unsafe_allow_html=True)
 
         with col_b3:
             st.markdown('<div class="lbl-amarillo">COSTOS Y SEGURIDAD</div>', unsafe_allow_html=True)
