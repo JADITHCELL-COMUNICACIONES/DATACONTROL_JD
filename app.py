@@ -192,7 +192,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-VERSION_ACTUAL = "1.8.61"
+VERSION_ACTUAL = "1.8.58"
 
 TAMANO_LETRA_IMPRESION = "14px"
 INTERLINEADO_IMPRESION = "1.35"
@@ -440,12 +440,12 @@ if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia =
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
-# INICIALIZACIÓN GLOBAL OBLIGATORIA DE LAS VARIABLES DE ESTADO
-if 'pre_cedula' not in st.session_state: st.session_state.pre_cedula = ""
-if 'pre_nombre' not in st.session_state: st.session_state.pre_nombre = ""
-if 'pre_telefono' not in st.session_state: st.session_state.pre_telefono = ""
-if 'pre_direccion' not in st.session_state: st.session_state.pre_direccion = ""
-if 'mapa_clientes_dict' not in st.session_state: st.session_state.mapa_clientes_dict = {}
+fc = st.session_state.form_counter
+
+if 'val_ced' not in st.session_state: st.session_state.val_ced = ""
+if 'val_nom' not in st.session_state: st.session_state.val_nom = ""
+if 'val_tel' not in st.session_state: st.session_state.val_tel = ""
+if 'val_dir' not in st.session_state: st.session_state.val_dir = ""
 
 st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
 
@@ -793,14 +793,84 @@ with tabs[0]:
 # 📦 PESTAÑA: INVENTARIO
 # =========================================================
 with tabs[1]:
+    st.markdown('<div class="jd-card">', unsafe_allow_html=True)
+    st.markdown("##### 🔍 BUSCAR PRODUCTO")
+    inv_busqueda = st.text_input("Nombre o código...", placeholder="Nombre o código...", label_visibility="collapsed", key="inv_busq_input")
+
+    conn_inv_sel = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+    if inv_busqueda:
+        cur_inv_sel = conn_inv_sel.cursor()
+        cur_inv_sel.execute(
+            "SELECT id, codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria "
+            "FROM productos WHERE nombre LIKE ? OR codigo LIKE ? ORDER BY categoria ASC, nombre ASC",
+            (f"%{inv_busqueda}%", f"%{inv_busqueda}%")
+        )
+        productos_encontrados = cur_inv_sel.fetchall()
+    else:
+        productos_encontrados = []
+    conn_inv_sel.close()
+
     col_inv_izq, col_inv_der = st.columns([1, 2])
 
     with col_inv_izq:
-        st.markdown('<div class="jd-card">', unsafe_allow_html=True)
-        st.markdown("##### 🔍 BUSCAR PRODUCTO")
-        inv_busqueda = st.text_input("Nombre o código...", placeholder="Nombre o código...", label_visibility="collapsed", key="inv_busq_input")
-
         st.markdown("##### GESTIÓN DE INVENTARIO")
+        if productos_encontrados:
+            opciones_edicion = [
+                f"{p[2]} — Código: {p[1] or 'N/A'} — Stock actual: {p[5] or 0}"
+                for p in productos_encontrados
+            ]
+            producto_edicion = st.selectbox(
+                "Producto encontrado",
+                options=["-- Seleccione el producto a editar --"] + opciones_edicion,
+                key="inv_producto_edicion"
+            )
+            if st.button("📥 Cargar producto para editar", use_container_width=True, key="inv_btn_cargar"):
+                if producto_edicion != "-- Seleccione el producto a editar --":
+                    producto_idx = opciones_edicion.index(producto_edicion)
+                    producto = productos_encontrados[producto_idx]
+                    st.session_state.inv_cod = str(producto[1] or "")
+                    st.session_state.inv_nom = str(producto[2] or "")
+                    st.session_state.inv_com = str(producto[3] or 0)
+                    st.session_state.inv_ven = str(producto[4] or 0)
+                    st.session_state.inv_stk = str(producto[5] or 0)
+                    st.session_state.inv_prov = str(producto[6] or "")
+                    st.session_state.inv_cat = str(producto[7] or "")
+                    st.session_state.inv_producto_id = producto[0]
+                    st.rerun()
+                else:
+                    st.warning("Seleccione un producto de la búsqueda.")
+
+            if st.button("🗑️ Eliminar producto seleccionado", use_container_width=True, key="inv_btn_eliminar"):
+                if producto_edicion != "-- Seleccione el producto a editar --":
+                    producto_idx = opciones_edicion.index(producto_edicion)
+                    producto = productos_encontrados[producto_idx]
+                    st.session_state.inv_eliminar_id = producto[0]
+                    st.session_state.inv_eliminar_nombre = producto[2]
+                    st.rerun()
+                else:
+                    st.warning("Seleccione un producto antes de eliminarlo.")
+
+            if st.session_state.get("inv_eliminar_id"):
+                nombre_eliminar = st.session_state.get("inv_eliminar_nombre", "este producto")
+                st.warning(f"¿Confirma eliminar definitivamente: {nombre_eliminar}?")
+                confirmar_eliminacion = st.button("✅ Sí, eliminar definitivamente", key="inv_btn_confirmar_eliminar")
+                cancelar_eliminacion = st.button("Cancelar", key="inv_btn_cancelar_eliminar")
+                if confirmar_eliminacion:
+                    conn_eliminar = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
+                    cur_eliminar = conn_eliminar.cursor()
+                    cur_eliminar.execute("DELETE FROM productos WHERE id = ?", (st.session_state.inv_eliminar_id,))
+                    conn_eliminar.commit()
+                    conn_eliminar.close()
+                    st.session_state.pop("inv_eliminar_id", None)
+                    st.session_state.pop("inv_eliminar_nombre", None)
+                    st.session_state.pop("inv_producto_id", None)
+                    st.success("¡Producto eliminado correctamente!")
+                    st.rerun()
+                elif cancelar_eliminacion:
+                    st.session_state.pop("inv_eliminar_id", None)
+                    st.session_state.pop("inv_eliminar_nombre", None)
+                    st.rerun()
+
         inv_codigo = st.text_input("Código", placeholder="Código", label_visibility="collapsed", key="inv_cod")
         inv_nombre = st.text_input("Nombre", placeholder="Nombre", label_visibility="collapsed", key="inv_nom")
         inv_compra = st.text_input("Precio Compra", placeholder="Precio Compra", label_visibility="collapsed", key="inv_com")
@@ -911,10 +981,32 @@ with tabs[1]:
                     c_val = int(float(inv_compra)) if inv_compra else 0
                     v_val = int(float(inv_venta)) if inv_venta else 0
                     s_val = int(inv_stock) if inv_stock else 0
-                    cur_db.execute("INSERT INTO productos (codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                   (inv_codigo, inv_nombre, c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper()))
+                    producto_id_edicion = st.session_state.get("inv_producto_id")
+                    if producto_id_edicion:
+                        # Si el producto fue cargado desde la búsqueda, Guardar
+                        # también debe modificar ese registro, nunca duplicarlo.
+                        cur_db.execute("UPDATE productos SET codigo=?, nombre=?, precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=? WHERE id=?",
+                                       (inv_codigo, inv_nombre, c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper(), producto_id_edicion))
+                        mensaje_guardado = "¡Producto actualizado exitosamente!"
+                    else:
+                        # Evitar duplicados incluso si se pulsa Guardar con una
+                        # referencia que ya existe en la base de datos.
+                        if inv_codigo:
+                            cur_db.execute("SELECT id FROM productos WHERE codigo = ? LIMIT 1", (inv_codigo,))
+                        else:
+                            cur_db.execute("SELECT id FROM productos WHERE nombre = ? LIMIT 1", (inv_nombre,))
+                        producto_existente = cur_db.fetchone()
+                        if producto_existente:
+                            cur_db.execute("UPDATE productos SET codigo=?, nombre=?, precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=? WHERE id=?",
+                                           (inv_codigo, inv_nombre, c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper(), producto_existente[0]))
+                            mensaje_guardado = "¡Producto existente actualizado exitosamente!"
+                        else:
+                            cur_db.execute("INSERT INTO productos (codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                           (inv_codigo, inv_nombre, c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper()))
+                            mensaje_guardado = "¡Producto guardado exitosamente!"
                     conn_db.commit()
-                    st.success("¡Producto guardado exitosamente!")
+                    st.success(mensaje_guardado)
+                    st.session_state.pop("inv_producto_id", None)
                     st.rerun()
                 except Exception as ex: st.error(f"Error: {ex}")
             else: st.error("El nombre es obligatorio.")
@@ -925,10 +1017,16 @@ with tabs[1]:
                     c_val = int(float(inv_compra)) if inv_compra else 0
                     v_val = int(float(inv_venta)) if inv_venta else 0
                     s_val = int(inv_stock) if inv_stock else 0
-                    cur_db.execute("UPDATE productos SET precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=?, nombre=? WHERE codigo=? OR nombre=?",
-                                   (c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper(), inv_nombre, inv_codigo, inv_nombre))
+                    producto_id_edicion = st.session_state.get("inv_producto_id")
+                    if producto_id_edicion:
+                        cur_db.execute("UPDATE productos SET codigo=?, nombre=?, precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=? WHERE id=?",
+                                       (inv_codigo, inv_nombre, c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper(), producto_id_edicion))
+                    else:
+                        cur_db.execute("UPDATE productos SET precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=?, nombre=? WHERE codigo=? OR nombre=?",
+                                       (c_val, v_val, s_val, inv_prov.upper(), inv_cat.upper(), inv_nombre, inv_codigo, inv_nombre))
                     conn_db.commit()
                     st.success("¡Actualizado correctamente!")
+                    st.session_state.pop("inv_producto_id", None)
                     st.rerun()
                 except Exception as ex: st.error(f"Error: {ex}")
             else: st.error("Ingrese código o nombre.")
@@ -973,7 +1071,7 @@ with tabs[1]:
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (CALLBACK DE AUTOCOMPLETADO SEGURO)
+# ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (AUTORRELLENO BLINDADO CON STATE)
 # =========================================================
 if cfg['modo_taller'] == 1:
     with tabs[2]:
@@ -994,21 +1092,6 @@ if cfg['modo_taller'] == 1:
         except:
             clientes_registrados = []
         conn_cli.close()
-
-        # Construimos el diccionario de mapeo en session_state para el callback
-        mapa_clientes = {}
-        opciones_clientes = ["-- Seleccionar cliente existente --"]
-        for c in clientes_registrados:
-            txt_opcion = f"{c[0]} — CC: {c[1]} — Tel: {c[2]}"
-            opciones_clientes.append(txt_opcion)
-            mapa_clientes[txt_opcion] = {
-                "nombre": str(c[0]) if c[0] else "",
-                "cedula": str(c[1]) if c[1] else "",
-                "telefono": str(c[2]) if c[2] else "",
-                "direccion": str(c[3]) if c[3] else ""
-            }
-
-        st.session_state.mapa_clientes_dict = mapa_clientes
 
         # Lienzo interactivo real para patrón
         def renderizar_lienzo_patron(secuencia_actual):
@@ -1040,44 +1123,62 @@ if cfg['modo_taller'] == 1:
 
         fc = st.session_state.form_counter
 
-        # --- FUNCIÓN DE CALLBACK PARA ACTUALIZAR AL SELECCIONAR CLIENTE ---
-        def al_seleccionar_cliente():
-            seleccion = st.session_state.get(f"select_cli_directo_{fc}", "-- Seleccionar cliente existente --")
-            diccionario = st.session_state.get("mapa_clientes_dict", {})
-            if seleccion in diccionario:
-                datos = diccionario[seleccion]
-                st.session_state.pre_nombre = datos["nombre"]
-                st.session_state.pre_cedula = datos["cedula"]
-                st.session_state.pre_telefono = datos["telefono"]
-                st.session_state.pre_direccion = datos["direccion"]
-            else:
-                st.session_state.pre_nombre = ""
-                st.session_state.pre_cedula = ""
-                st.session_state.pre_telefono = ""
-                st.session_state.pre_direccion = ""
-
-        # --- SELECTOR DE CLIENTES FRECUENTES CON ON_CHANGE ---
+        # --- SELECTOR CON CARGA DIRECTA VÍA SESSION_STATE ---
         if clientes_registrados:
             st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
-            st.markdown("<div class='lbl-celeste'>🔍 Seleccionar Cliente Frecuente (Autocompletar automático):</div>", unsafe_allow_html=True)
+            st.markdown("<div class='lbl-celeste'>🔍 Seleccionar Cliente Frecuente:</div>", unsafe_allow_html=True)
             
-            st.selectbox(
-                "Seleccionar cliente",
-                options=opciones_clientes,
-                key=f"select_cli_directo_{fc}",
-                on_change=al_seleccionar_cliente,
-                label_visibility="collapsed"
-            )
+            opciones_clientes = ["-- Seleccionar cliente existente --"] + [f"{c[0]} — CC: {c[1]} — Tel: {c[2]}" for c in clientes_registrados]
+            
+            sel_col1, sel_col2 = st.columns([3, 1])
+            with sel_col1:
+                cliente_seleccionado_dropdown = st.selectbox(
+                    "Seleccionar cliente",
+                    options=opciones_clientes,
+                    key=f"select_cli_directo_{fc}",
+                    label_visibility="collapsed"
+                )
+            with sel_col2:
+                btn_cargar_datos_cli = st.button("📥 Cargar Datos", key=f"btn_cargar_datos_{fc}", use_container_width=True)
+
+            if btn_cargar_datos_cli:
+                if cliente_seleccionado_dropdown != "-- Seleccionar cliente existente --":
+                    for c in clientes_registrados:
+                        txt_comparacion = f"{c[0]} — CC: {c[1]} — Tel: {c[2]}"
+                        if txt_comparacion == cliente_seleccionado_dropdown:
+                            # Actualizar las claves reales de los widgets. Cambiar
+                            # solo val_* no actualizaba de forma fiable los campos
+                            # visibles después del rerun.
+                            datos_cli = {
+                                "ced": str(c[1]) if c[1] else "",
+                                "nom": str(c[0]) if c[0] else "",
+                                "tel": str(c[2]) if c[2] else "",
+                                "dir": str(c[3]) if c[3] else ""
+                            }
+                            st.session_state.val_ced = datos_cli["ced"]
+                            st.session_state.val_nom = datos_cli["nom"]
+                            st.session_state.val_tel = datos_cli["tel"]
+                            st.session_state.val_dir = datos_cli["dir"]
+                            st.session_state[f"t_ced_{fc}"] = datos_cli["ced"]
+                            st.session_state[f"t_cli_{fc}"] = datos_cli["nom"]
+                            st.session_state[f"t_tel_{fc}"] = datos_cli["tel"]
+                            st.session_state[f"t_dir_{fc}"] = datos_cli["dir"]
+                            break
+                    st.success("¡Datos del cliente cargados con éxito!")
+                    st.rerun()
+                else:
+                    st.warning("Por favor, seleccione un cliente válido de la lista.")
+
             st.markdown('</div>', unsafe_allow_html=True)
 
         col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
         
         with col_b1:
             st.markdown('<div class="lbl-amarillo">DATOS DEL CLIENTE</div>', unsafe_allow_html=True)
-            ot_cedula = st.text_input("Cédula / NIT", value=st.session_state.pre_cedula, placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
-            ot_cliente = st.text_input("Nombre del cliente *", value=st.session_state.pre_nombre, placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
-            ot_tel = st.text_input("Teléfono *", value=st.session_state.pre_telefono, placeholder="* Teléfono", key=f"t_tel_{fc}")
-            ot_dir = st.text_input("Dirección", value=st.session_state.pre_direccion, placeholder="Dirección", key=f"t_dir_{fc}")
+            ot_cedula = st.text_input("Cédula / NIT", value=st.session_state.val_ced, placeholder="* Cédula / NIT / ID", key=f"t_ced_{fc}")
+            ot_cliente = st.text_input("Nombre del cliente *", value=st.session_state.val_nom, placeholder="* Nombre del cliente", key=f"t_cli_{fc}")
+            ot_tel = st.text_input("Teléfono *", value=st.session_state.val_tel, placeholder="* Teléfono", key=f"t_tel_{fc}")
+            ot_dir = st.text_input("Dirección", value=st.session_state.val_dir, placeholder="Dirección", key=f"t_dir_{fc}")
 
         with col_b2:
             st.markdown('<div class="lbl-amarillo">DATOS DEL SERVICIO Y EQUIPO</div>', unsafe_allow_html=True)
@@ -1152,19 +1253,13 @@ if cfg['modo_taller'] == 1:
                 val_costo = limpiar_monto(ot_costo_str)
                 val_abono = limpiar_monto(ot_abono_str)
 
-                # Tomamos los valores directamente de los inputs actualizados en pantalla
-                cli_val_final = st.session_state.get(f"t_cli_{fc}", ot_cliente)
-                ced_val_final = st.session_state.get(f"t_ced_{fc}", ot_cedula)
-                tel_val_final = st.session_state.get(f"t_tel_{fc}", ot_tel)
-                dir_val_final = st.session_state.get(f"t_dir_{fc}", ot_dir)
-
-                if cli_val_final and ot_equipo and ot_falla:
+                if ot_cliente and ot_equipo and ot_falla:
                     conn = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                   (cli_val_final, ced_val_final, tel_val_final, dir_val_final, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
+                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
                     conn.commit()
                     
                     cursor.execute("SELECT last_insert_rowid()")
@@ -1175,14 +1270,14 @@ if cfg['modo_taller'] == 1:
                     
                     st.session_state.patron_secuencia = ""
                     st.session_state.firma_secuencia = ""
-                    st.session_state.pre_cedula = ""
-                    st.session_state.pre_nombre = ""
-                    st.session_state.pre_telefono = ""
-                    st.session_state.pre_direccion = ""
+                    st.session_state.val_ced = ""
+                    st.session_state.val_nom = ""
+                    st.session_state.val_tel = ""
+                    st.session_state.val_dir = ""
                     st.session_state.form_counter += 1
                     
                     st.session_state.recibo_taller = {
-                        "id": nueva_id, "cliente": cli_val_final, "cedula": ced_val_final, "telefono": tel_val_final,
+                        "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
                         "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
                         "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
                         "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
@@ -1197,10 +1292,24 @@ if cfg['modo_taller'] == 1:
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
+            # Normalizar datos para evitar que la vista previa falle por
+            # valores nulos o tipos numéricos entregados como texto.
+            try:
+                rt_id = int(rt.get("id") or 0)
+            except (TypeError, ValueError):
+                rt_id = 0
+            try:
+                rt_costo = float(rt.get("costo") or 0)
+            except (TypeError, ValueError):
+                rt_costo = 0.0
+            try:
+                rt_abono = float(rt.get("abono") or 0)
+            except (TypeError, ValueError):
+                rt_abono = 0.0
+            saldo_r = rt_costo - rt_abono
             fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-            saldo_r = rt['costo'] - rt['abono']
 
-            with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt['id']:04d} — LISTO PARA IMPRIMIR", expanded=True):
+            with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt_id:04d} — LISTO PARA IMPRIMIR", expanded=True):
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
                     col_tr1, col_tr2, col_tr3 = st.columns([2, 1, 2])
                     with col_tr2:
@@ -1214,7 +1323,7 @@ if cfg['modo_taller'] == 1:
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
- ORDEN DE SERVICIO N°: {rt['id']:04d}
+ ORDEN DE SERVICIO N°: {rt_id:04d}
  FECHA: {fecha_taller_actual}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
@@ -1225,8 +1334,8 @@ if cfg['modo_taller'] == 1:
  SEGURIDAD/PATRÓN: {rt['patron']}
  NOTAS:   {rt['chequeo']}
 ------------------------------------------
- COSTO TOTAL:       ${rt['costo']:,.2f}
- TOTAL ABONADO:     ${rt['abono']:,.2f}
+ COSTO TOTAL:       ${rt_costo:,.2f}
+ TOTAL ABONADO:     ${rt_abono:,.2f}
  SALDO PENDIENTE:   ${saldo_r:,.2f}
  ESTADO ACTUAL:     {rt['estado']}
 ==========================================
@@ -1244,7 +1353,7 @@ if cfg['modo_taller'] == 1:
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
- ORDEN DE SERVICIO N°: {rt['id']:04d}
+ ORDEN DE SERVICIO N°: {rt_id:04d}
  FECHA: {fecha_taller_actual}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
@@ -1254,8 +1363,8 @@ if cfg['modo_taller'] == 1:
  FALLA:   {rt['falla']}
  NOTAS:   {rt['chequeo']}
 ------------------------------------------
- COSTO TOTAL:       ${rt['costo']:,.2f}
- TOTAL ABONADO:     ${rt['abono']:,.2f}
+ COSTO TOTAL:       ${rt_costo:,.2f}
+ TOTAL ABONADO:     ${rt_abono:,.2f}
  SALDO PENDIENTE:   ${saldo_r:,.2f}
  ESTADO ACTUAL:     {rt['estado']}
 ==========================================
@@ -1280,7 +1389,7 @@ if cfg['modo_taller'] == 1:
                         
                         conn_f = sqlite3.connect('jadithcell_comunicaciones.db', check_same_thread=False)
                         cur_f = conn_f.cursor()
-                        cur_f.execute("SELECT firma_path FROM ordenes_servicio WHERE id = ?", (rt['id'],))
+                        cur_f.execute("SELECT firma_path FROM ordenes_servicio WHERE id = ?", (rt_id,))
                         res_f = cur_f.fetchone()
                         conn_f.close()
                         
@@ -1314,14 +1423,20 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                     padding-bottom: 3mm;
                                 }}
-                                .ticket-container {{ 
-                                    text-align: left; 
-                                    font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 14px; 
-                                    line-height: 1.35; 
-                                    font-weight: bold; 
-                                    white-space: pre; 
-                                    display: inline-block;
+.ticket-container {{
+                                    text-align: left;
+                                    font-family: 'Courier New', Courier, monospace;
+                                    font-size: 14px;
+                                    line-height: 1.35;
+                                    font-weight: bold;
+                                    /* Conserva saltos y envuelve textos largos. */
+                                    white-space: pre-wrap;
+                                    overflow-wrap: anywhere;
+                                    word-break: break-word;
+                                    display: block;
+                                    width: 100%;
+                                    max-width: 100%;
+                                    box-sizing: border-box;
                                     letter-spacing: -0.3px;
                                 }}
                             </style>
@@ -1652,7 +1767,7 @@ with tabs[-1]:
     
     st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
     st.markdown("##### 🟩 Estado de la Licencia")
-    st.info("**Licencia Profesional Activa** — Quedan **336 días** restantes de servicio ininterrupido.")
+    st.info("**Licencia Profesional Activa** — Quedan **336 días** restantes de servicio ininterrumpido.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     c_empresa = st.text_input("Nombre de la Empresa", value=cfg['empresa'], key="cfg_emp")
