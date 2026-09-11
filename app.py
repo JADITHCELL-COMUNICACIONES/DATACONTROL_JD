@@ -226,6 +226,18 @@ def obtener_conexion():
     return sqlite3.connect("jadithcell_comunicaciones.db", check_same_thread=False)
 
 
+def consultar_dataframe(conn, query, params=None):
+    """Ejecuta una consulta con el cursor nativo y devuelve un DataFrame."""
+    cursor = conn.cursor()
+    if params is None:
+        cursor.execute(query)
+    else:
+        cursor.execute(query, params)
+    filas = cursor.fetchall()
+    columnas = [col[0] for col in cursor.description] if cursor.description else []
+    return pd.DataFrame(filas, columns=columnas)
+
+
 # --- ESTILOS VISUALES Y MÓDULOS EN VERDE CON ACTIVO EN ROJO ---
 st.markdown("""
     <style>
@@ -925,7 +937,12 @@ with tabs[1]:
         st.markdown('<div class="lbl-celeste">📊 Exportar Inventario:</div>', unsafe_allow_html=True)
         try:
             conn_exp = obtener_conexion()
-            df_export = pd.read_sql("SELECT codigo as Código, nombre as Nombre, precio_compra as 'Precio Compra', precio_venta as 'Precio Venta', stock as Stock, proveedor as Proveedor, categoria as Categoría FROM productos ORDER BY categoria ASC, nombre ASC", conn_exp)
+            df_export = consultar_dataframe(
+                conn_exp,
+                "SELECT codigo as Código, nombre as Nombre, precio_compra as 'Precio Compra', "
+                "precio_venta as 'Precio Venta', stock as Stock, proveedor as Proveedor, "
+                "categoria as Categoría FROM productos ORDER BY categoria ASC, nombre ASC",
+            )
             conn_exp.close()
 
             if not df_export.empty:
@@ -952,7 +969,7 @@ with tabs[1]:
             try:
                 importados = 0
                 if nombre_archivo.endswith((".xlsx", ".xls")):
-                    df_raw = pd.read_excel(archivo_subido, header=None)
+                    df_raw = pd.read_excel(archivo_subido, header=None, engine="openpyxl")
                     fila_inicio = 0
                     for idx, row in df_raw.iterrows():
                         fila_str = str(row.values).lower()
@@ -960,7 +977,7 @@ with tabs[1]:
                             fila_inicio = idx + 1
                             break
                     
-                    df_datos = pd.read_excel(archivo_subido, skiprows=fila_inicio, header=None)
+                    df_datos = pd.read_excel(archivo_subido, skiprows=fila_inicio, header=None, engine="openpyxl")
                     cur_db.execute("DELETE FROM productos")
 
                     for _, row in df_datos.iterrows():
@@ -1078,7 +1095,7 @@ with tabs[1]:
         if inv_busqueda:
             query_inv += f" WHERE nombre LIKE '%{inv_busqueda}%' OR codigo LIKE '%{inv_busqueda}%'"
         query_inv += " ORDER BY categoria ASC, nombre ASC"
-        df_inventario_tabla = pd.read_sql(query_inv, conn)
+        df_inventario_tabla = consultar_dataframe(conn, query_inv)
         conn.close()
 
         if not df_inventario_tabla.empty:
@@ -1511,7 +1528,7 @@ if cfg['modo_taller'] == 1:
             params.extend([f"%{filtro_texto}%", f"%{filtro_texto}%", f"%{filtro_texto}%"])
 
         query_base += " ORDER BY id DESC"
-        df_ordenes_tabla = pd.read_sql(query_base, conn, params=params)
+        df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
         conn.close()
 
         # Pestañas exclusivas por estado
