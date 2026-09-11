@@ -611,4 +611,5 @@ with tabs[0]:
         )
       with b_col4:
         st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-        btn_add = st.form_submit_button("➕ Agregar"
+        btn_add = st.form_submit_button("➕ Agregar")
+        st.markdown("</div>", unsafe_allow_html=True)
