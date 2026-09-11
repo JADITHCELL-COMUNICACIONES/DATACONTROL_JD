@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 from urllib.parse import quote
-import libsql_client
+import libsql
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -207,7 +207,7 @@ def obtener_conexion():
   ):
     url = st.secrets["TURSO_DATABASE_URL"]
     token = st.secrets["TURSO_AUTH_TOKEN"]
-    return libsql_client.connect(url=url, auth_token=token)
+    return libsql.connect(url=url, auth_token=token)
   else:
     import sqlite3
 
@@ -611,4 +611,4 @@ with tabs[0]:
         )
       with b_col4:
         st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
-        btn_add
+        btn_add = st.form_submit_button("➕ Agregar"
