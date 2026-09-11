@@ -5,7 +5,7 @@ import io
 import os
 from pathlib import Path
 import re
-from urllib.parse.quote import quote  # type: ignore
+from urllib.parse import quote
 import libsql_client
 import pandas as pd
 import streamlit as st
