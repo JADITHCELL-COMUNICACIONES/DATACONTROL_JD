@@ -207,7 +207,11 @@ def obtener_conexion():
   ):
     url = st.secrets["TURSO_DATABASE_URL"]
     token = st.secrets["TURSO_AUTH_TOKEN"]
-    return libsql.connect(url=url, auth_token=token)
+    return libsql.connect(
+        "jadithcell_turso_replica.db",
+        sync_url=url,
+        auth_token=token,
+    )
   else:
     import sqlite3
 
