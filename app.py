@@ -17,6 +17,7 @@ import shutil
 import base64
 from PIL import Image, ImageDraw, ImageFont
 import io
+import hashlib
 
 
 # --- COMPONENTE DE PATRÓN SEGURO ---
@@ -229,10 +230,7 @@ def obtener_conexion():
 def consultar_dataframe(conn, query, params=None):
     """Ejecuta una consulta con el cursor nativo y devuelve un DataFrame."""
     cursor = conn.cursor()
-    if params is None:
-        cursor.execute(query)
-    else:
-        cursor.execute(query, params)
+    cursor.execute(query, params or ())
     filas = cursor.fetchall()
     columnas = [col[0] for col in cursor.description] if cursor.description else []
     return pd.DataFrame(filas, columns=columnas)
@@ -965,56 +963,78 @@ with tabs[1]:
         cur_db = conn_db.cursor()
 
         if archivo_subido is not None:
-            nombre_archivo = archivo_subido.name.lower()
-            try:
-                importados = 0
-                if nombre_archivo.endswith((".xlsx", ".xls")):
-                    df_raw = pd.read_excel(archivo_subido, header=None, engine="openpyxl")
-                    fila_inicio = 0
-                    for idx, row in df_raw.iterrows():
-                        fila_str = str(row.values).lower()
-                        if 'código' in fila_str or 'nombre' in fila_str:
-                            fila_inicio = idx + 1
-                            break
-                    
-                    df_datos = pd.read_excel(archivo_subido, skiprows=fila_inicio, header=None, engine="openpyxl")
-                    cur_db.execute("DELETE FROM productos")
+            archivo_bytes = archivo_subido.getvalue()
+            archivo_id = hashlib.sha256(archivo_bytes).hexdigest()
+            archivo_ya_procesado = st.session_state.get("inventario_importado_id") == archivo_id
 
-                    for _, row in df_datos.iterrows():
-                        try:
-                            val_codigo = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
-                            if not val_codigo or val_codigo.lower() == "nan" or val_codigo.lower() == "código":
-                                continue
+            if not archivo_ya_procesado:
+                nombre_archivo = archivo_subido.name.lower()
+                try:
+                    importados = 0
+                    if nombre_archivo.endswith((".xlsx", ".xls")):
+                        # Usar BytesIO permite leer dos veces el archivo sin depender del cursor interno.
+                        datos_excel = io.BytesIO(archivo_bytes)
+                        df_raw = pd.read_excel(datos_excel, header=None, engine="openpyxl")
+                        fila_inicio = 0
+                        for idx, row in df_raw.iterrows():
+                            fila_str = str(row.values).lower()
+                            if 'código' in fila_str or 'codigo' in fila_str or 'nombre' in fila_str:
+                                fila_inicio = idx + 1
+                                break
 
-                            c_code = val_codigo
-                            c_name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
-                            if not c_name or c_name.lower() == "nan": continue
+                        datos_excel.seek(0)
+                        df_datos = pd.read_excel(datos_excel, skiprows=fila_inicio, header=None, engine="openpyxl")
+                        cur_db.execute("DELETE FROM productos")
 
-                            def limpiar_entero(v):
+                        for _, row in df_datos.iterrows():
+                            try:
+                                val_codigo = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
+                                if not val_codigo or val_codigo.lower() == "nan" or val_codigo.lower() in ("código", "codigo"):
+                                    continue
+
+                                c_code = val_codigo
+                                c_name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
+                                if not c_name or c_name.lower() == "nan":
+                                    continue
+
+                                def limpiar_entero(v):
+                                    try:
+                                        if pd.isna(v):
+                                            return 0
+                                        return int(float(str(v).replace('$', '').replace(',', '.')))
+                                    except Exception:
+                                        return 0
+
+                                c_comp = limpiar_entero(row.iloc[2])
+                                c_vent = limpiar_entero(row.iloc[3])
                                 try:
-                                    if pd.isna(v): return 0
-                                    return int(float(str(v).replace('$', '').replace(',', '.')))
-                                except: return 0
+                                    c_stk = int(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
+                                except Exception:
+                                    c_stk = 0
 
-                            c_comp = limpiar_entero(row.iloc[2])
-                            c_vent = limpiar_entero(row.iloc[3])
-                            
-                            try: c_stk = int(row.iloc[4]) if pd.notna(row.iloc[4]) else 0
-                            except: c_stk = 0
+                                c_prov = str(row.iloc[7]).strip().upper() if len(row) > 7 and pd.notna(row.iloc[7]) and str(row.iloc[7]).lower() != "nan" else ""
+                                c_cate = str(row.iloc[8]).strip().upper() if len(row) > 8 and pd.notna(row.iloc[8]) and str(row.iloc[8]).lower() != "nan" else "GENERAL"
 
-                            c_prov = str(row.iloc[7]).strip().upper() if len(row) > 7 and pd.notna(row.iloc[7]) and str(row.iloc[7]).lower() != "nan" else ""
-                            c_cate = str(row.iloc[8]).strip().upper() if len(row) > 8 and pd.notna(row.iloc[8]) and str(row.iloc[8]).lower() != "nan" else "GENERAL"
+                                cur_db.execute(
+                                    "INSERT INTO productos (codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                    (c_code, c_name, c_comp, c_vent, c_stk, c_prov, c_cate),
+                                )
+                                importados += 1
+                            except Exception:
+                                pass
 
-                            cur_db.execute("INSERT INTO productos (codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                           (c_code, c_name, c_comp, c_vent, c_stk, c_prov, c_cate))
-                            importados += 1
-                        except: pass
-
-                conn_db.commit()
-                st.success(f"¡Inventario importado con éxito! {importados} productos cargados.")
-                st.rerun()
-            except Exception as err:
-                st.error(f"Error procesando el archivo: {err}")
+                    conn_db.commit()
+                    st.session_state["inventario_importado_id"] = archivo_id
+                    st.success(f"¡Inventario importado con éxito! {importados} productos cargados.")
+                    st.rerun()
+                except Exception as err:
+                    try:
+                        conn_db.rollback()
+                    except Exception:
+                        pass
+                    st.error(f"Error procesando el archivo: {err}")
+            else:
+                st.info("Este archivo ya fue importado. Selecciona otro archivo para cargarlo nuevamente.")
 
         if btn_limpiar_inv: st.rerun()
 
