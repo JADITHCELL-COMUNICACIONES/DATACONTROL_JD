@@ -1325,8 +1325,17 @@ if cfg['modo_taller'] == 1:
                                    (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
                     conn.commit()
                     
-                    cursor.execute("SELECT last_insert_rowid()")
-                    nueva_id = cursor.fetchone()[0]
+                    # Obtener el ID real asignado por la base de datos.
+                    # Con Turso/libSQL, last_insert_rowid() puede devolver 0 aunque
+                    # la inserción haya sido exitosa; lastrowid es la fuente correcta.
+                    nueva_id = getattr(cursor, "lastrowid", None)
+                    if not nueva_id:
+                        cursor.execute("SELECT id FROM ordenes_servicio ORDER BY id DESC LIMIT 1")
+                        fila_id = cursor.fetchone()
+                        nueva_id = fila_id[0] if fila_id else None
+                    if not nueva_id:
+                        raise RuntimeError("No se pudo obtener el número de la orden creada.")
+                    nueva_id = int(nueva_id)
                     conn.close()
 
                     st.success("¡Orden de servicio guardada con éxito!")
