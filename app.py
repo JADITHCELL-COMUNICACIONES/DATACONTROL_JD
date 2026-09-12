@@ -320,6 +320,30 @@ st.markdown("""
     .stTabs [data-baseweb="tab-highlight"] {
         background-color: #ef4444 !important;
     }
+    /* Contraste uniforme para textos y campos del formulario en móviles y escritorio. */
+    div[data-testid="stTextArea"] label,
+    div[data-testid="stTextInput"] label,
+    div[data-testid="stNumberInput"] label,
+    div[data-testid="stSelectbox"] label {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        opacity: 1 !important;
+    }
+    div[data-testid="stTextArea"] textarea,
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stNumberInput"] input,
+    div[data-testid="stSelectbox"] [role="combobox"] {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        background-color: #1b2638 !important;
+        border: 1px solid #64748b !important;
+        opacity: 1 !important;
+    }
+    div[data-testid="stTextArea"] textarea::placeholder,
+    div[data-testid="stTextInput"] input::placeholder {
+        color: #cbd5e1 !important;
+        opacity: 1 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1470,6 +1494,8 @@ if cfg['modo_taller'] == 1:
                         firma_html = ""
                         if firma_url_final and str(firma_url_final).startswith('data:image'):
                             firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_url_final}" style="max-width: 130px; height: auto; border-bottom: 1px solid #000;" /></div>'
+                        else:
+                            firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
                         cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
@@ -1780,6 +1806,8 @@ if cfg['modo_taller'] == 1:
                         firma_html = ""
                         if firma_bd_url and str(firma_bd_url).startswith('data:image'):
                             firma_html = f'<div style="margin-top: 10px; margin-bottom: 10px; text-align: center;"><p style="font-size: 12px; margin: 0 0 4px 0;">Firma del Cliente:</p><img src="{firma_bd_url}" style="max-width: 130px; height: auto; border-bottom: 1px solid #000;" /></div>'
+                        else:
+                            firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
                         cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
