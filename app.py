@@ -1591,17 +1591,15 @@ if cfg['modo_taller'] == 1:
         if mensaje_actualizacion:
             st.success(mensaje_actualizacion)
         if whatsapp_pendiente:
-            # Redirección directa a WhatsApp Web. Se usa la pestaña actual
-            # para evitar que el navegador bloquee una ventana emergente
-            # después del st.rerun().
-            components.html(
-                f"""
-                <script>
-                    window.top.location.href = {whatsapp_pendiente!r};
-                </script>
-                <meta http-equiv="refresh" content="0; url={whatsapp_pendiente}">
-                """,
-                height=1,
+            # Botón visible después de guardar. El clic del usuario abre
+            # WhatsApp y evita el bloqueo de ventanas emergentes del navegador.
+            st.markdown(
+                f"<a href='{whatsapp_pendiente}' target='_blank' "
+                "style='background:#25d366;color:white;padding:10px 16px;"
+                "border-radius:6px;text-decoration:none;font-weight:bold;"
+                "display:inline-block;margin:8px 0;'>"
+                "💬 Abrir mensaje de WhatsApp</a>",
+                unsafe_allow_html=True,
             )
 
         # Pestañas exclusivas por estado
