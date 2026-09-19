@@ -1586,6 +1586,25 @@ if cfg['modo_taller'] == 1:
         df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
         conn.close()
 
+        mensaje_actualizacion = st.session_state.pop("mensaje_actualizacion", None)
+        whatsapp_pendiente = st.session_state.pop("whatsapp_pendiente", None)
+        if mensaje_actualizacion:
+            st.success(mensaje_actualizacion)
+        if whatsapp_pendiente:
+            # Intento automático; si el navegador bloquea la ventana nueva,
+            # queda disponible el enlace visible como alternativa.
+            components.html(
+                f"<script>window.open('{whatsapp_pendiente}', '_blank');</script>",
+                height=0,
+            )
+            st.markdown(
+                f"<a href='{whatsapp_pendiente}' target='_blank' "
+                "style='background:#25d366;color:white;padding:8px 14px;"
+                "border-radius:5px;text-decoration:none;font-weight:bold;'>"
+                "💬 Abrir mensaje de WhatsApp</a>",
+                unsafe_allow_html=True,
+            )
+
         # Pestañas exclusivas por estado
         tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
 
@@ -1735,7 +1754,7 @@ if cfg['modo_taller'] == 1:
                         st.markdown("<br>##### ✍️ Firma Registrada:", unsafe_allow_html=True)
                         st.image(firma_bd_url, width=220)
                 
-                col_btn_f1, col_btn_f2, col_btn_f3, col_btn_f4 = st.columns(4)
+                col_btn_f1, col_btn_f2 = st.columns(2)
                 with col_btn_f1:
                     if st.button("💾 Guardar Cambios de Ficha", use_container_width=True):
                         try:
@@ -1746,21 +1765,47 @@ if cfg['modo_taller'] == 1:
                                            (nuevo_patron_edit, nuevo_estado_edit, total_final_abono, oid))
                             conn.commit()
                             conn.close()
-                            st.success("¡Ficha técnica actualizada con éxito!")
+                            # Preparar automáticamente el mensaje según el estado.
+                            # WhatsApp requiere una acción del navegador para enviarlo;
+                            # por eso se abre con el texto listo para confirmar.
+                            mensajes_estado = {
+                                "REPARADO": (
+                                    f"Apreciado(a) {ord_data[1]}, le informamos que su equipo "
+                                    f"{ord_data[5]} (Orden #{oid:04d}) fue reparado y está listo "
+                                    "para ser recogido. Gracias por confiar en nosotros."
+                                ),
+                                "SIN SOLUCIÓN": (
+                                    f"Apreciado(a) {ord_data[1]}, después de la revisión técnica le "
+                                    f"informamos que su equipo {ord_data[5]} (Orden #{oid:04d}) no "
+                                    "pudo ser reparado. Puede acercarse a nuestro establecimiento "
+                                    "para recibir más información y retirarlo."
+                                ),
+                                "ENTREGADO": (
+                                    f"Apreciado(a) {ord_data[1]}, confirmamos que su equipo "
+                                    f"{ord_data[5]} (Orden #{oid:04d}) fue entregado correctamente. "
+                                    "Gracias por preferirnos."
+                                ),
+                            }
+                            mensaje_estado = mensajes_estado.get(nuevo_estado_edit)
+                            telefono_cliente = re.sub(r"\D", "", str(ord_data[3] or ""))
+                            if mensaje_estado and telefono_cliente:
+                                st.session_state.whatsapp_pendiente = (
+                                    f"https://wa.me/57{telefono_cliente}?text={quote(mensaje_estado)}"
+                                )
+                            else:
+                                st.session_state.whatsapp_pendiente = None
+
+                            st.session_state.ficha_orden_id = None
+                            st.session_state.mensaje_actualizacion = (
+                                "¡Ficha actualizada correctamente!"
+                                if not mensaje_estado
+                                else f"¡Estado actualizado a {nuevo_estado_edit}!"
+                            )
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Error al actualizar: {ex}")
 
                 with col_btn_f2:
-                    msg_w = quote(f"Hola *{ord_data[1]}*, le escribimos de *{cfg['empresa']}*.\n\nSu equipo *{ord_data[5]}* (Orden #{oid:04d}) se encuentra en estado: *{nuevo_estado_edit}*.\nSaldo pendiente: ${c_pen:,.2f}.\n\n¡Gracias por confiar en nosotros!")
-                    st.markdown(f"<a href='https://wa.me/57{ord_data[3].replace(' ', '')}?text={msg_w}' target='_blank' style='background-color: #25d366; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; display: block; text-align: center; margin-top: 4px;'>💬 Enviar WhatsApp</a>", unsafe_allow_html=True)
-
-                with col_btn_f3:
-                    if st.button("❌ Cerrar Banco de Reparación", use_container_width=True):
-                        st.session_state.ficha_orden_id = None
-                        st.rerun()
-
-                with col_btn_f4:
                     if st.button("🖨️ Imprimir Copia", type="primary", use_container_width=True, key=f"btn_imprimir_copia_{oid}"):
                         fecha_copia = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                         saldo_copia = c_tot - c_abo
