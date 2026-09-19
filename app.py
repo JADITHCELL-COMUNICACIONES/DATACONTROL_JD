@@ -1648,8 +1648,9 @@ if cfg['modo_taller'] == 1:
 
         st.markdown("---")
 
-        # BANCO DE REPARACIÓN (FICHA TÉCNICA Y SEGURIDAD)
-        if st.session_state.ficha_orden_id:
+        # BANCO DE REPARACIÓN: se abre como ventana modal para no cargar debajo de la lista.
+        @st.dialog("🛠️ Banco de reparación", width="large")
+        def mostrar_ficha_modal(oid):
             oid = st.session_state.ficha_orden_id
             conn = obtener_conexion()
             cursor = conn.cursor()
@@ -1780,6 +1781,12 @@ if cfg['modo_taller'] == 1:
                                     "pudo ser reparado. Puede acercarse a nuestro establecimiento "
                                     "para recibir más información y retirarlo."
                                 ),
+                                "ESPERANDO REPUESTO": (
+                                    f"Apreciado(a) {ord_data[1]}, le informamos que su equipo "
+                                    f"{ord_data[5]} (Orden #{oid:04d}) se encuentra a la espera de "
+                                    "un repuesto necesario para continuar con la reparación. "
+                                    "Le avisaremos cuando tengamos novedades. Gracias por su comprensión."
+                                ),
                                 "ENTREGADO": (
                                     f"Apreciado(a) {ord_data[1]}, confirmamos que su equipo "
                                     f"{ord_data[5]} (Orden #{oid:04d}) fue entregado correctamente. "
@@ -1901,6 +1908,9 @@ if cfg['modo_taller'] == 1:
                             </html>
                         """, height=0)
 
+
+        if st.session_state.ficha_orden_id:
+            mostrar_ficha_modal(st.session_state.ficha_orden_id)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
