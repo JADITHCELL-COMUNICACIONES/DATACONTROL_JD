@@ -1591,13 +1591,13 @@ if cfg['modo_taller'] == 1:
         if mensaje_actualizacion:
             st.success(mensaje_actualizacion)
         if whatsapp_pendiente:
-            # Redirección directa a WhatsApp Web. Se usa la pestaña actual
-            # para evitar que el navegador bloquee una ventana emergente
-            # después del st.rerun().
+            # El guardado ya hizo st.rerun() y cerró la ficha. Ahora se navega
+            # directamente desde Servicios a la API de WhatsApp, sin botón
+            # intermedio ni ventana emergente bloqueable.
             components.html(
                 f"""
                 <script>
-                    window.top.location.href = {whatsapp_pendiente!r};
+                    window.parent.location.replace({whatsapp_pendiente!r});
                 </script>
                 <meta http-equiv="refresh" content="0; url={whatsapp_pendiente}">
                 """,
