@@ -1797,27 +1797,18 @@ if cfg['modo_taller'] == 1:
                             st.session_state.ficha_orden_id = None
 
                             if mensaje_estado and telefono_cliente:
-                                # Redirigir dentro del mismo evento del botón.
-                                # Así el navegador conserva la autorización del clic
-                                # y no bloquea la navegación a WhatsApp Web.
-                                whatsapp_url = (
+                                st.session_state.whatsapp_pendiente = (
                                     f"https://api.whatsapp.com/send?phone=57{telefono_cliente}"
                                     f"&text={quote(mensaje_estado)}"
                                 )
-                                components.html(
-                                    f"""
-                                    <a id="abrir-whatsapp" href="{whatsapp_url}" target="_top">
-                                        Continuar en WhatsApp Web
-                                    </a>
-                                    <script>
-                                        document.getElementById('abrir-whatsapp').click();
-                                    </script>
-                                    """,
-                                    height=1,
-                                )
-                                st.stop()
+                            else:
+                                st.session_state.whatsapp_pendiente = None
 
-                            st.session_state.mensaje_actualizacion = "¡Ficha actualizada correctamente!"
+                            st.session_state.mensaje_actualizacion = (
+                                "¡Ficha actualizada correctamente!"
+                                if not mensaje_estado
+                                else f"¡Estado actualizado a {nuevo_estado_edit}!"
+                            )
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Error al actualizar: {ex}")
