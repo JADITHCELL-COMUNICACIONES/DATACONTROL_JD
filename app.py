@@ -209,19 +209,23 @@ def obtener_tiempo_colombia():
 # --- CONEXIÓN UNIVERSAL A TURSO / SQLITE ---
 def obtener_conexion():
     """Conecta a Turso usando Secrets; si no están disponibles, usa SQLite local."""
-    tiene_secrets = (
-        hasattr(st, "secrets")
-        and "TURSO_DATABASE_URL" in st.secrets
-        and "TURSO_AUTH_TOKEN" in st.secrets
-        and str(st.secrets["TURSO_DATABASE_URL"]).strip()
-        and str(st.secrets["TURSO_AUTH_TOKEN"]).strip()
-    )
+    # En ejecución local, st.secrets lanza StreamlitSecretNotFoundError si
+    # todavía no existe .streamlit/secrets.toml. Eso no debe impedir usar
+    # SQLite local ni arrancar la aplicación.
+    try:
+        secrets_config = dict(st.secrets)
+    except Exception:
+        secrets_config = {}
+
+    database_url = str(secrets_config.get("TURSO_DATABASE_URL", "")).strip()
+    auth_token = str(secrets_config.get("TURSO_AUTH_TOKEN", "")).strip()
+    tiene_secrets = bool(database_url and auth_token)
 
     if tiene_secrets and libsql is not None:
         return libsql.connect(
             "jadithcell_comunicaciones.db",
-            sync_url=str(st.secrets["TURSO_DATABASE_URL"]).strip(),
-            auth_token=str(st.secrets["TURSO_AUTH_TOKEN"]).strip(),
+            sync_url=database_url,
+            auth_token=auth_token,
         )
 
     return sqlite3.connect("jadithcell_comunicaciones.db", check_same_thread=False)
@@ -498,6 +502,7 @@ if 'ficha_orden_id' not in st.session_state: st.session_state.ficha_orden_id = N
 if 'patron_secuencia' not in st.session_state: st.session_state.patron_secuencia = ""
 if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia = ""
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
+if 'venta_form_counter' not in st.session_state: st.session_state.venta_form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
 
 fc = st.session_state.form_counter
@@ -530,13 +535,13 @@ with tabs[0]:
     c_col1, c_col2, c_col3 = st.columns(3)
     with c_col1:
         st.markdown('<div class="lbl-amarillo">Identificación Cliente</div>', unsafe_allow_html=True)
-        v_cedula = st.text_input("Cédula", placeholder="Cédula o NIT...", label_visibility="collapsed", key="v_ced")
+        v_cedula = st.text_input("Cédula", placeholder="Cédula o NIT...", label_visibility="collapsed", key=f"v_ced_{st.session_state.venta_form_counter}")
     with c_col2:
         st.markdown('<div class="lbl-amarillo">Nombre Cliente</div>', unsafe_allow_html=True)
-        v_nombre_cliente = st.text_input("Nombre", placeholder="Nombre completo...", label_visibility="collapsed", key="v_nom")
+        v_nombre_cliente = st.text_input("Nombre", placeholder="Nombre completo...", label_visibility="collapsed", key=f"v_nom_{st.session_state.venta_form_counter}")
     with c_col3:
         st.markdown('<div class="lbl-amarillo">Teléfono Cliente</div>', unsafe_allow_html=True)
-        v_telefono = st.text_input("Teléfono", placeholder="Número de contacto...", label_visibility="collapsed", key="v_tel")
+        v_telefono = st.text_input("Teléfono", placeholder="Número de contacto...", label_visibility="collapsed", key=f"v_tel_{st.session_state.venta_form_counter}")
     st.markdown('</div>', unsafe_allow_html=True)
 
     col_izq, col_der = st.columns([2.8, 1.2])
@@ -556,11 +561,11 @@ with tabs[0]:
         with st.form(key="form_agregar_carrito", clear_on_submit=False):
             b_col1, b_col2, b_col3, b_col4 = st.columns([1.5, 2.5, 0.8, 0.8])
             with b_col1:
-                cod_buscado = st.text_input("Búsqueda por Código", placeholder="Código...", key="v_cod_busc")
+                cod_buscado = st.text_input("Búsqueda por Código", placeholder="Código...", key=f"v_cod_busc_{st.session_state.venta_form_counter}")
             with b_col2:
-                prod_seleccionado_txt = st.selectbox("Búsqueda por nombre...", options=["-- Seleccione producto --"] + list(dict_por_nombre.keys()), key="v_sel_nom")
+                prod_seleccionado_txt = st.selectbox("Búsqueda por nombre...", options=["-- Seleccione producto --"] + list(dict_por_nombre.keys()), key=f"v_sel_nom_{st.session_state.venta_form_counter}")
             with b_col3:
-                v_cantidad = st.number_input("Cant", min_value=1, value=1, step=1, key="v_cant_num")
+                v_cantidad = st.number_input("Cant", min_value=1, value=1, step=1, key=f"v_cant_num_{st.session_state.venta_form_counter}")
             with b_col4:
                 st.markdown("<div style='padding-top: 24px;'>", unsafe_allow_html=True)
                 btn_add = st.form_submit_button("➕ Agregar")
@@ -664,7 +669,7 @@ with tabs[0]:
 
         st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
         st.markdown('<div class="lbl-celeste">Notas del pedido:</div>', unsafe_allow_html=True)
-        v_notas = st.text_area("Notas", value="Los cambios se realizan únicamente por defectos de fabricación.", height=68, label_visibility="collapsed", key="v_txt_notas")
+        v_notas = st.text_area("Notas", value="Los cambios se realizan únicamente por defectos de fabricación.", height=68, label_visibility="collapsed", key=f"v_txt_notas_{st.session_state.venta_form_counter}")
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -679,18 +684,18 @@ with tabs[0]:
         st.markdown(f'<div class="val-total">${subtotal_calc:,.2f}</div>', unsafe_allow_html=True)
 
         st.markdown("<br>**Recibido (Opcional)**", unsafe_allow_html=True)
-        v_recibido = st.number_input("Recibido", min_value=0.0, value=0.0, step=1000.0, label_visibility="collapsed", key="v_num_recibido")
+        v_recibido = st.number_input("Recibido", min_value=0.0, value=0.0, step=1000.0, label_visibility="collapsed", key=f"v_num_recibido_{st.session_state.venta_form_counter}")
 
         if cfg['modo_taller'] == 1:
             st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
             st.markdown('<div class="lbl-celeste">📱 IMEI / Seriales del Equipo:</div>', unsafe_allow_html=True)
-            v_imei1 = st.text_input("IMEI 1", placeholder="IMEI 1", label_visibility="collapsed", key="v_imei1_input")
-            v_imei2 = st.text_input("IMEI 2", placeholder="IMEI 2 (Opcional)", label_visibility="collapsed", key="v_imei2_input")
+            v_imei1 = st.text_input("IMEI 1", placeholder="IMEI 1", label_visibility="collapsed", key=f"v_imei1_input_{st.session_state.venta_form_counter}")
+            v_imei2 = st.text_input("IMEI 2", placeholder="IMEI 2 (Opcional)", label_visibility="collapsed", key=f"v_imei2_input_{st.session_state.venta_form_counter}")
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             v_imei1, v_imei2 = "", ""
 
-        check_prestamo = st.checkbox("¿PRESTAMO?", key="v_chk_prestamo")
+        check_prestamo = st.checkbox("¿PRESTAMO?", key=f"v_chk_prestamo_{st.session_state.venta_form_counter}")
 
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("VENTA", type="primary", use_container_width=True, key="v_btn_procesar_venta"):
@@ -844,9 +849,17 @@ with tabs[0]:
                         </body>
                         </html>
                     """, height=0)
+                    # Preparar inmediatamente la pantalla para la siguiente venta.
+                    # El contador crea nuevas claves y evita conservar datos del cliente anterior.
+                    st.session_state.carrito = []
+                    st.session_state.recibo_generado = None
+                    st.session_state.venta_form_counter += 1
+                    st.rerun()
             with col_pr2:
                 if st.button("Cerrar Ticket de Venta", use_container_width=True, key="v_btn_cerrar_ticket"):
                     st.session_state.recibo_generado = None
+                    st.session_state.carrito = []
+                    st.session_state.venta_form_counter += 1
                     st.rerun()
 
 # =========================================================
@@ -1594,7 +1607,7 @@ if cfg['modo_taller'] == 1:
             # Botón visible después de guardar. El clic del usuario abre
             # WhatsApp y evita el bloqueo de ventanas emergentes del navegador.
             st.markdown(
-                f"<a href='{whatsapp_pendiente}' target='_blank' "
+                f"<a href='{whatsapp_pendiente}' target='_blank' onclick='this.remove();' "
                 "style='background:#25d366;color:white;padding:10px 16px;"
                 "border-radius:6px;text-decoration:none;font-weight:bold;"
                 "display:inline-block;margin:8px 0;'>"
