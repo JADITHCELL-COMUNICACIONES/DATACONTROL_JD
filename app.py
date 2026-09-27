@@ -1718,6 +1718,31 @@ if cfg['modo_taller'] == 1:
                     </div>
                 """, unsafe_allow_html=True)
 
+                st.markdown("##### 💬 Mensaje personalizado al cliente")
+                mensaje_personalizado = st.text_area(
+                    "Escriba la novedad que desea comunicar:",
+                    value="",
+                    placeholder=(
+                        "Ejemplo: Apreciado cliente, le informamos que ya llegó el repuesto "
+                        "de su equipo y comenzaremos la reparación."
+                    ),
+                    height=100,
+                    key=f"mensaje_personalizado_{oid}",
+                )
+                telefono_personalizado = re.sub(r"\D", "", str(ord_data[3] or ""))
+                if telefono_personalizado and mensaje_personalizado.strip():
+                    url_mensaje_personalizado = (
+                        f"https://api.whatsapp.com/send?phone=57{telefono_personalizado}"
+                        f"&text={quote(mensaje_personalizado.strip())}"
+                    )
+                    st.link_button(
+                        "💬 Abrir WhatsApp con este mensaje",
+                        url_mensaje_personalizado,
+                        use_container_width=True,
+                    )
+                elif not telefono_personalizado:
+                    st.warning("Esta orden no tiene un número telefónico válido para WhatsApp.")
+
                 st.markdown(f"""
                     <div style="background-color: #162032; padding: 12px; border-radius: 8px; border: 1px solid #1f293d; margin-top: 10px; display: flex; justify-content: space-around; text-align: center;">
                         <div><span style="color: #94a3b8; font-size: 12px;">COSTO TOTAL</span><br><span style="color: #00ffcc; font-size: 18px; font-weight: bold;">${c_tot:,.2f}</span></div>
