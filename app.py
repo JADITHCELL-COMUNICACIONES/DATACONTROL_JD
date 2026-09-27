@@ -316,12 +316,22 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] button,
     .stTabs [data-baseweb="tab-list"] button * {
         color: #22c55e !important;
+        -webkit-text-fill-color: #22c55e !important;
         font-weight: bold !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="false"],
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] *,
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] div,
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] div p,
+    .stTabs [data-baseweb="tab-list"] button[role="tab"][aria-selected="false"] {
+        color: #22c55e !important;
+        -webkit-text-fill-color: #22c55e !important;
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] div p,
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"],
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] * {
         color: #ef4444 !important;
+        -webkit-text-fill-color: #ef4444 !important;
         font-weight: bold !important;
     }
     .stTabs [data-baseweb="tab-highlight"] {
