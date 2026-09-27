@@ -337,6 +337,26 @@ st.markdown("""
     .stTabs [data-baseweb="tab-highlight"] {
         background-color: #ef4444 !important;
     }
+    /* Refuerzo para versiones de Streamlit que pintan las pestañas con role=tab. */
+    button[role="tab"][aria-selected="false"],
+    button[role="tab"][aria-selected="false"] p,
+    button[role="tab"][aria-selected="false"] span,
+    button[role="tab"][aria-selected="false"] div,
+    button[role="tab"][aria-selected="false"] * {
+        color: rgb(34, 197, 94) !important;
+        -webkit-text-fill-color: rgb(34, 197, 94) !important;
+        opacity: 1 !important;
+        text-shadow: none !important;
+    }
+    button[role="tab"][aria-selected="true"],
+    button[role="tab"][aria-selected="true"] p,
+    button[role="tab"][aria-selected="true"] span,
+    button[role="tab"][aria-selected="true"] div,
+    button[role="tab"][aria-selected="true"] * {
+        color: rgb(239, 68, 68) !important;
+        -webkit-text-fill-color: rgb(239, 68, 68) !important;
+        opacity: 1 !important;
+    }
     /* Contraste uniforme para textos y campos del formulario en móviles y escritorio. */
     div[data-testid="stTextArea"] label,
     div[data-testid="stTextInput"] label,
