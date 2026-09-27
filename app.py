@@ -1827,6 +1827,7 @@ if cfg['modo_taller'] == 1:
                                     mime="application/zip",
                                     use_container_width=True,
                                     key=f"descargar_evidencias_{oid}",
+                                    on_click="ignore",
                                     help="Descarga únicamente las imágenes seleccionadas.",
                                 )
                             with ev_send_2:
