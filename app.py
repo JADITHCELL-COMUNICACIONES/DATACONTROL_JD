@@ -313,12 +313,14 @@ st.markdown("""
         border: none !important;
     }
     .stTabs [data-baseweb="tab-list"] button div p,
-    .stTabs [data-baseweb="tab-list"] button {
+    .stTabs [data-baseweb="tab-list"] button,
+    .stTabs [data-baseweb="tab-list"] button * {
         color: #22c55e !important;
         font-weight: bold !important;
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] div p,
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"],
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] * {
         color: #ef4444 !important;
         font-weight: bold !important;
     }
