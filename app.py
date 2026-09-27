@@ -1686,7 +1686,10 @@ if cfg['modo_taller'] == 1:
                         <p style="margin: 4px 0;"><b>Fecha:</b> {ord_data[13]} &nbsp;|&nbsp; <b>Cliente:</b> {ord_data[1]} (CC: {ord_data[2]})</p>
                         <p style="margin: 4px 0;"><b>Teléfono:</b> {ord_data[3]} &nbsp;|&nbsp; <b>Dirección:</b> {ord_data[4]}</p>
                         <p style="margin: 4px 0;"><b>Equipo:</b> {ord_data[5]} &nbsp;|&nbsp; <b>IMEI:</b> {ord_data[6]}</p>
-                        <p style="margin: 4px 0;"><b>Falla Reportada:</b> {ord_data[7]}</p>
+                        <div style="margin-top: 14px; padding: 12px 14px; background-color: #3b1118; border: 2px solid #ef4444; border-radius: 8px; color: #fecaca;">
+                            <div style="color: #f87171; font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">⚠️ FALLA REPORTADA</div>
+                            <div style="color: #ff4d4d; font-size: 24px; line-height: 1.35; font-weight: 900;">{ord_data[7] or 'Sin descripción registrada'}</div>
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
 
