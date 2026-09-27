@@ -1582,23 +1582,6 @@ if cfg['modo_taller'] == 1:
         st.markdown('<div class="jd-card">', unsafe_allow_html=True)
         st.subheader("🛠️ Gestión de Servicios y Órdenes Registradas")
         
-        # --- BÚSQUEDA Y PESTAÑAS CON SCROLL FIJO (ALTURA 320px) ---
-        f_col1, f_col2 = st.columns([2, 1])
-        with f_col1:
-            filtro_texto = st.text_input("Buscar por Número de Orden, Nombre o Cédula:", placeholder="Ej: 15, Juan Pérez, 12345678...", key="filtro_orden_servicios")
-
-        conn = obtener_conexion()
-        query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
-        params = []
-
-        if filtro_texto:
-            query_base += " AND (id LIKE ? OR cliente LIKE ? OR cedula LIKE ?)"
-            params.extend([f"%{filtro_texto}%", f"%{filtro_texto}%", f"%{filtro_texto}%"])
-
-        query_base += " ORDER BY id DESC"
-        df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
-        conn.close()
-
         mensaje_actualizacion = st.session_state.pop("mensaje_actualizacion", None)
         whatsapp_pendiente = st.session_state.pop("whatsapp_pendiente", None)
         if mensaje_actualizacion:
@@ -1615,46 +1598,68 @@ if cfg['modo_taller'] == 1:
                 unsafe_allow_html=True,
             )
 
-        # Pestañas exclusivas por estado
-        tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
+        # Solo esta lista se actualiza automáticamente. Ventas, Crear Orden y
+        # la ficha abierta no se vuelven a ejecutar cada 10 segundos.
+        @st.fragment(run_every="10s")
+        def mostrar_ordenes_actualizadas():
+            f_col1, f_col2 = st.columns([2, 1])
+            with f_col1:
+                filtro_texto = st.text_input(
+                    "Buscar por Número de Orden, Nombre o Cédula:",
+                    placeholder="Ej: 15, Juan Pérez, 12345678...",
+                    key="filtro_orden_servicios",
+                )
+            with f_col2:
+                if st.button(
+                    "🔄 Actualizar todo",
+                    use_container_width=True,
+                    key="btn_actualizar_todo",
+                    help="Vuelve a consultar inventario, ventas, órdenes y configuración en Turso",
+                ):
+                    # scope="app" vuelve a ejecutar todo el script, no solo el fragmento.
+                    st.rerun(scope="app")
 
-        def mostrar_tabla_con_seleccion(df_sub, sufijo):
-            if df_sub.empty:
-                st.info("No hay órdenes en esta sección.")
-                return
-            
-            # Contenedor con scroll vertical fijo para evitar estirar la página
-            with st.container(height=320):
-                for _, row in df_sub.iterrows():
-                    col_row1, col_row2, col_row3, col_row4, col_row5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
-                    with col_row1: st.markdown(f"**#{row['ID']:04d}**")
-                    with col_row2: st.markdown(f"{row['Cliente']}")
-                    with col_row3: st.markdown(f"{row['Equipo']}")
-                    with col_row4: st.markdown(f"🟢 `{row['Estado']}`")
-                    with col_row5:
-                        if st.button("🛠️ Ver Ficha", key=f"btn_{sufijo}_{row['ID']}"):
-                            st.session_state.ficha_orden_id = row['ID']
-                            st.rerun()
-                    st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
+            conn = obtener_conexion()
+            query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
+            params = []
+            if filtro_texto:
+                query_base += " AND (id LIKE ? OR cliente LIKE ? OR cedula LIKE ?)"
+                params.extend([f"%{filtro_texto}%", f"%{filtro_texto}%", f"%{filtro_texto}%"])
+            query_base += " ORDER BY id DESC"
+            df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
+            conn.close()
 
-        with tab_proceso:
-            df_proc = df_ordenes_tabla[df_ordenes_tabla['Estado'].isin(["PENDIENTE", "EN REVISIÓN", "ESPERANDO REPUESTO", "SIN SOLUCIÓN"])]
-            mostrar_tabla_con_seleccion(df_proc, "proceso")
+            tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
 
-        with tab_reparadas:
-            df_rep = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "REPARADO"]
-            mostrar_tabla_con_seleccion(df_rep, "reparadas")
+            def mostrar_tabla_con_seleccion(df_sub, sufijo):
+                if df_sub.empty:
+                    st.info("No hay órdenes en esta sección.")
+                    return
+                with st.container(height=320):
+                    for _, row in df_sub.iterrows():
+                        col_row1, col_row2, col_row3, col_row4, col_row5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
+                        with col_row1: st.markdown(f"**#{row['ID']:04d}**")
+                        with col_row2: st.markdown(f"{row['Cliente']}")
+                        with col_row3: st.markdown(f"{row['Equipo']}")
+                        with col_row4: st.markdown(f"🟢 `{row['Estado']}`")
+                        with col_row5:
+                            if st.button("🛠️ Ver Ficha", key=f"btn_{sufijo}_{row['ID']}"):
+                                st.session_state.ficha_orden_id = row['ID']
+                                st.rerun()
+                        st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
 
-        with tab_entregadas:
-            df_ent = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "ENTREGADO"]
-            mostrar_tabla_con_seleccion(df_ent, "entregadas")
+            with tab_proceso:
+                mostrar_tabla_con_seleccion(df_ordenes_tabla[df_ordenes_tabla['Estado'].isin(["PENDIENTE", "EN REVISIÓN", "ESPERANDO REPUESTO", "SIN SOLUCIÓN"])], "proceso")
+            with tab_reparadas:
+                mostrar_tabla_con_seleccion(df_ordenes_tabla[df_ordenes_tabla['Estado'] == "REPARADO"], "reparadas")
+            with tab_entregadas:
+                mostrar_tabla_con_seleccion(df_ordenes_tabla[df_ordenes_tabla['Estado'] == "ENTREGADO"], "entregadas")
+            with tab_garantias:
+                mostrar_tabla_con_seleccion(df_ordenes_tabla[df_ordenes_tabla['Estado'] == "GARANTÍA"], "garantias")
+            with tab_todas:
+                mostrar_tabla_con_seleccion(df_ordenes_tabla, "todas")
 
-        with tab_garantias:
-            df_gar = df_ordenes_tabla[df_ordenes_tabla['Estado'] == "GARANTÍA"]
-            mostrar_tabla_con_seleccion(df_gar, "garantias")
-
-        with tab_todas:
-            mostrar_tabla_con_seleccion(df_ordenes_tabla, "todas")
+        mostrar_ordenes_actualizadas()
 
         st.markdown("---")
 
