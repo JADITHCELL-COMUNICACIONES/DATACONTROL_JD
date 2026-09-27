@@ -1385,6 +1385,20 @@ if cfg['modo_taller'] == 1:
                     nueva_id = int(nueva_id)
                     conn.close()
 
+                    telefono_nueva_orden = re.sub(r"\D", "", str(ot_tel or ""))
+                    if telefono_nueva_orden:
+                        mensaje_nueva_orden = (
+                            f"Apreciado(a) {ot_cliente}, se ha generado una orden de servicio "
+                            f"para su equipo {ot_equipo}. Su número de orden es #{nueva_id:04d}. "
+                            "Gracias por confiar en nosotros."
+                        )
+                        st.session_state.whatsapp_nueva_orden = (
+                            f"https://api.whatsapp.com/send?phone=57{telefono_nueva_orden}"
+                            f"&text={quote(mensaje_nueva_orden)}"
+                        )
+                    else:
+                        st.session_state.whatsapp_nueva_orden = None
+
                     st.success("¡Orden de servicio guardada con éxito!")
                     
                     st.session_state.patron_secuencia = ""
@@ -1408,6 +1422,17 @@ if cfg['modo_taller'] == 1:
         with col_btn_reg2:
             if st.button("🛠️ Ver Servicios", use_container_width=True, key=f"btn_ir_servicios_{fc}"):
                 st.rerun()
+
+        whatsapp_nueva_orden = st.session_state.pop("whatsapp_nueva_orden", None)
+        if whatsapp_nueva_orden:
+            st.markdown(
+                f"<a href='{whatsapp_nueva_orden}' target='_blank' onclick='this.remove();' "
+                "style='background:#25d366;color:white;padding:10px 16px;"
+                "border-radius:6px;text-decoration:none;font-weight:bold;"
+                "display:inline-block;margin:8px 0;'>"
+                "💬 Enviar recepción por WhatsApp</a>",
+                unsafe_allow_html=True,
+            )
 
         if st.session_state.recibo_taller:
             rt = st.session_state.recibo_taller
