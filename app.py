@@ -512,7 +512,17 @@ if 'val_nom' not in st.session_state: st.session_state.val_nom = ""
 if 'val_tel' not in st.session_state: st.session_state.val_tel = ""
 if 'val_dir' not in st.session_state: st.session_state.val_dir = ""
 
-st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
+enc_col1, enc_col2 = st.columns([5, 1])
+with enc_col1:
+    st.markdown(f"### ⚙️ DATACONTROL JD v{VERSION_ACTUAL} - {cfg['empresa']}")
+with enc_col2:
+    if st.button(
+        "🔄 Actualizar todo",
+        use_container_width=True,
+        key="btn_actualizar_todo_global",
+        help="Vuelve a consultar inventario, ventas, órdenes y configuración en Turso",
+    ):
+        st.rerun(scope="app")
 
 tabs_labels = ["🛒 Módulo de Ventas", "📦 Inventario"]
 if cfg['modo_taller'] == 1:
@@ -1602,22 +1612,12 @@ if cfg['modo_taller'] == 1:
         # la ficha abierta no se vuelven a ejecutar cada 10 segundos.
         @st.fragment(run_every="10s")
         def mostrar_ordenes_actualizadas():
-            f_col1, f_col2 = st.columns([2, 1])
-            with f_col1:
+            with st.container():
                 filtro_texto = st.text_input(
                     "Buscar por Número de Orden, Nombre o Cédula:",
                     placeholder="Ej: 15, Juan Pérez, 12345678...",
                     key="filtro_orden_servicios",
                 )
-            with f_col2:
-                if st.button(
-                    "🔄 Actualizar todo",
-                    use_container_width=True,
-                    key="btn_actualizar_todo",
-                    help="Vuelve a consultar inventario, ventas, órdenes y configuración en Turso",
-                ):
-                    # scope="app" vuelve a ejecutar todo el script, no solo el fragmento.
-                    st.rerun(scope="app")
 
             conn = obtener_conexion()
             query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
