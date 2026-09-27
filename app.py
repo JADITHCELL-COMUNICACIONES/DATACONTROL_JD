@@ -1715,6 +1715,10 @@ if cfg['modo_taller'] == 1:
                             <div style="color: #f87171; font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">⚠️ FALLA REPORTADA</div>
                             <div style="color: #ff4d4d; font-size: 24px; line-height: 1.35; font-weight: 900;">{ord_data[7] or 'Sin descripción registrada'}</div>
                         </div>
+                        <div style="margin-top: 12px; padding: 11px 14px; background-color: #172554; border: 1px solid #60a5fa; border-radius: 8px; color: #dbeafe;">
+                            <div style="color: #93c5fd; font-size: 14px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">📝 NOTAS ADICIONALES / CHEQUEO FÍSICO</div>
+                            <div style="color: #ffffff; font-size: 17px; line-height: 1.4; font-weight: 600;">{ord_data[12] or 'Sin notas adicionales registradas'}</div>
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
 
