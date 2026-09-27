@@ -18,6 +18,7 @@ import base64
 from PIL import Image, ImageDraw, ImageFont
 import io
 import hashlib
+import zipfile
 
 
 # --- COMPONENTE DE PATRÓN SEGURO ---
@@ -412,6 +413,15 @@ def inicializar_bd():
                         detalles_chequeo TEXT,
                         foto_path TEXT,
                         fecha TEXT)''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS evidencias_orden (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        orden_id INTEGER NOT NULL,
+                        nombre_archivo TEXT NOT NULL,
+                        contenido BLOB NOT NULL,
+                        tipo_mime TEXT DEFAULT 'image/jpeg',
+                        fecha TEXT,
+                        FOREIGN KEY (orden_id) REFERENCES ordenes_servicio(id))''')
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS ventas (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1339,6 +1349,14 @@ if cfg['modo_taller'] == 1:
         ot_notas = st.text_input("Notas adicionales / Chequeo físico", placeholder="Notas adicionales / Chequeo físico", key=f"t_not_{fc}")
         st.markdown('</div>', unsafe_allow_html=True)
 
+        fotos_ingreso = st.file_uploader(
+            "📷 Evidencias fotográficas de ingreso (opcional)",
+            type=["jpg", "jpeg", "png", "webp"],
+            accept_multiple_files=True,
+            key=f"fotos_ingreso_{fc}",
+            help="Puedes seleccionar varias fotos del equipo al momento de recibirlo.",
+        )
+
         st.markdown("<br>", unsafe_allow_html=True)
         col_btn_reg1, col_btn_reg2 = st.columns([4, 1])
         with col_btn_reg1:
@@ -1383,6 +1401,15 @@ if cfg['modo_taller'] == 1:
                     if not nueva_id:
                         raise RuntimeError("No se pudo obtener el número de la orden creada.")
                     nueva_id = int(nueva_id)
+
+                    for foto in fotos_ingreso or []:
+                        contenido_foto = foto.getvalue()
+                        if contenido_foto:
+                            cursor.execute(
+                                "INSERT INTO evidencias_orden (orden_id, nombre_archivo, contenido, tipo_mime, fecha) VALUES (?, ?, ?, ?, ?)",
+                                (nueva_id, foto.name, contenido_foto, foto.type or "image/jpeg", fecha_ahora),
+                            )
+                    conn.commit()
                     conn.close()
 
                     telefono_nueva_orden = re.sub(r"\D", "", str(ot_tel or ""))
@@ -1748,6 +1775,107 @@ if cfg['modo_taller'] == 1:
                         st.caption("Escriba un mensaje arriba antes de pulsar el botón de envío.")
                 elif not telefono_personalizado:
                     st.warning("Esta orden no tiene un número telefónico válido para WhatsApp.")
+
+                st.markdown("##### 📷 Evidencias fotográficas del equipo")
+                if not st.session_state.get(f"mostrar_evidencias_{oid}", False):
+                    if st.button("📷 Ver evidencias del equipo", key=f"ver_evidencias_{oid}", use_container_width=True):
+                        st.session_state[f"mostrar_evidencias_{oid}"] = True
+                        st.rerun()
+                else:
+                    conn_ev = obtener_conexion()
+                    cur_ev = conn_ev.cursor()
+                    cur_ev.execute(
+                        "SELECT id, nombre_archivo, contenido, tipo_mime FROM evidencias_orden WHERE orden_id = ? ORDER BY id ASC",
+                        (oid,),
+                    )
+                    evidencias = cur_ev.fetchall()
+                    conn_ev.close()
+
+                    if not evidencias:
+                        st.info("Esta orden todavía no tiene evidencias fotográficas.")
+                    else:
+                        st.caption("Marca únicamente las imágenes que deseas descargar y enviar al cliente.")
+                        evidencias_seleccionadas = []
+                        for evidencia_id, nombre_archivo, contenido, tipo_mime in evidencias:
+                            ev_col1, ev_col2 = st.columns([1, 3])
+                            with ev_col1:
+                                st.image(contenido, width=150)
+                            with ev_col2:
+                                if st.checkbox(
+                                    f"Seleccionar {nombre_archivo}",
+                                    key=f"evidencia_sel_{evidencia_id}",
+                                ):
+                                    evidencias_seleccionadas.append((evidencia_id, nombre_archivo, contenido, tipo_mime))
+
+                        if evidencias_seleccionadas:
+                            zip_buffer = io.BytesIO()
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                                for _, nombre_archivo, contenido, _ in evidencias_seleccionadas:
+                                    zip_file.writestr(nombre_archivo, contenido)
+                            zip_buffer.seek(0)
+                            mensaje_evidencias = (
+                                f"Apreciado(a) {ord_data[1]}, le compartimos las evidencias fotográficas "
+                                f"seleccionadas de su equipo {ord_data[5]} (Orden #{ord_data[0]:04d})."
+                            )
+                            st.caption("Prepara el envío una sola vez: descarga el ZIP y luego abre WhatsApp sin volver a seleccionar las fotos.")
+                            ev_send_1, ev_send_2 = st.columns(2)
+                            with ev_send_1:
+                                st.download_button(
+                                    "📤 1. Descargar ZIP",
+                                    data=zip_buffer.getvalue(),
+                                    file_name=f"Evidencias_Orden_{ord_data[0]:04d}.zip",
+                                    mime="application/zip",
+                                    use_container_width=True,
+                                    key=f"descargar_evidencias_{oid}",
+                                    help="Descarga únicamente las imágenes seleccionadas.",
+                                )
+                            with ev_send_2:
+                                if telefono_personalizado:
+                                    url_evidencias = (
+                                        f"https://api.whatsapp.com/send?phone=57{telefono_personalizado}"
+                                        f"&text={quote(mensaje_evidencias)}"
+                                    )
+                                    st.link_button(
+                                        "💬 2. Abrir WhatsApp",
+                                        url_evidencias,
+                                        use_container_width=True,
+                                        help="Abre el chat con el mensaje preparado.",
+                                    )
+                                else:
+                                    st.warning("La orden no tiene teléfono.")
+                        else:
+                            st.info("Selecciona al menos una imagen para habilitar el envío.")
+
+                    if st.button("➕ Agregar más evidencias", key=f"agregar_evidencias_{oid}", use_container_width=True):
+                        st.session_state[f"mostrar_cargador_evidencias_{oid}"] = True
+                        st.rerun()
+
+                    if st.session_state.get(f"mostrar_cargador_evidencias_{oid}", False):
+                        fotos_adicionales = st.file_uploader(
+                            "Seleccionar nuevas evidencias",
+                            type=["jpg", "jpeg", "png", "webp"],
+                            accept_multiple_files=True,
+                            key=f"fotos_adicionales_{oid}",
+                        )
+                        if st.button("💾 Guardar nuevas evidencias", key=f"guardar_evidencias_{oid}", use_container_width=True):
+                            if fotos_adicionales:
+                                conn_add_ev = obtener_conexion()
+                                cur_add_ev = conn_add_ev.cursor()
+                                fecha_ev = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                                for foto_adicional in fotos_adicionales:
+                                    contenido_adicional = foto_adicional.getvalue()
+                                    if contenido_adicional:
+                                        cur_add_ev.execute(
+                                            "INSERT INTO evidencias_orden (orden_id, nombre_archivo, contenido, tipo_mime, fecha) VALUES (?, ?, ?, ?, ?)",
+                                            (oid, foto_adicional.name, contenido_adicional, foto_adicional.type or "image/jpeg", fecha_ev),
+                                        )
+                                conn_add_ev.commit()
+                                conn_add_ev.close()
+                                st.session_state[f"mostrar_cargador_evidencias_{oid}"] = False
+                                st.success("Evidencias agregadas correctamente.")
+                                st.rerun()
+                            else:
+                                st.warning("Selecciona al menos una imagen.")
 
                 st.markdown(f"""
                     <div style="background-color: #162032; padding: 12px; border-radius: 8px; border: 1px solid #1f293d; margin-top: 10px; display: flex; justify-content: space-around; text-align: center;">
