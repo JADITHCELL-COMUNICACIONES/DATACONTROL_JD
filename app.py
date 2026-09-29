@@ -245,8 +245,9 @@ def consultar_dataframe(conn, query, params=None):
 st.markdown("""
     <style>
     .stApp {
-        background-color: #0d131f;
-        color: #ffffff;
+        background-color: #0b1220;
+        color: #ffffff !important;
+        font-size: 16px !important;
     }
     .jd-card {
         background-color: #111822;
@@ -315,27 +316,28 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] button div p,
     .stTabs [data-baseweb="tab-list"] button,
     .stTabs [data-baseweb="tab-list"] button * {
-        color: #22c55e !important;
-        -webkit-text-fill-color: #22c55e !important;
+        color: #4ade80 !important;
+        -webkit-text-fill-color: #4ade80 !important;
         font-weight: bold !important;
+        font-size: 15px !important;
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="false"],
     .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] *,
     .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] div,
     .stTabs [data-baseweb="tab-list"] button[aria-selected="false"] div p,
     .stTabs [data-baseweb="tab-list"] button[role="tab"][aria-selected="false"] {
-        color: #22c55e !important;
-        -webkit-text-fill-color: #22c55e !important;
+        color: #4ade80 !important;
+        -webkit-text-fill-color: #4ade80 !important;
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] div p,
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"],
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] * {
-        color: #ef4444 !important;
-        -webkit-text-fill-color: #ef4444 !important;
+        color: #ff4d4d !important;
+        -webkit-text-fill-color: #ff4d4d !important;
         font-weight: bold !important;
     }
     .stTabs [data-baseweb="tab-highlight"] {
-        background-color: #ef4444 !important;
+        background-color: #ff4d4d !important;
     }
     /* Refuerzo para versiones de Streamlit que pintan las pestañas con role=tab. */
     button[role="tab"][aria-selected="false"],
@@ -343,8 +345,8 @@ st.markdown("""
     button[role="tab"][aria-selected="false"] span,
     button[role="tab"][aria-selected="false"] div,
     button[role="tab"][aria-selected="false"] * {
-        color: rgb(34, 197, 94) !important;
-        -webkit-text-fill-color: rgb(34, 197, 94) !important;
+        color: rgb(74, 222, 128) !important;
+        -webkit-text-fill-color: rgb(74, 222, 128) !important;
         opacity: 1 !important;
         text-shadow: none !important;
     }
@@ -353,8 +355,8 @@ st.markdown("""
     button[role="tab"][aria-selected="true"] span,
     button[role="tab"][aria-selected="true"] div,
     button[role="tab"][aria-selected="true"] * {
-        color: rgb(239, 68, 68) !important;
-        -webkit-text-fill-color: rgb(239, 68, 68) !important;
+        color: rgb(255, 77, 77) !important;
+        -webkit-text-fill-color: rgb(255, 77, 77) !important;
         opacity: 1 !important;
     }
     /* Contraste uniforme para textos y campos del formulario en móviles y escritorio. */
