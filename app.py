@@ -893,7 +893,7 @@ with tabs[0]:
                             }}
                         </style>
                         </head>
-                        <body onload="window.print()">
+                        <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                             <div class="print-wrapper">
                                 {logo_html}
                                 <div class="ticket-container">{ticket_impresion_final}</div>
@@ -901,12 +901,9 @@ with tabs[0]:
                         </body>
                         </html>
                     """, height=0)
-                    # Preparar inmediatamente la pantalla para la siguiente venta.
-                    # El contador crea nuevas claves y evita conservar datos del cliente anterior.
-                    st.session_state.carrito = []
-                    st.session_state.recibo_generado = None
-                    st.session_state.venta_form_counter += 1
-                    st.rerun()
+                    # No ejecutar st.rerun() aquí: destruye el iframe antes de que
+                    # el navegador alcance a abrir el diálogo de impresión.
+                    # El ticket se limpia con "Cerrar Ticket de Venta" después de imprimir.
             with col_pr2:
                 if st.button("Cerrar Ticket de Venta", use_container_width=True, key="v_btn_cerrar_ticket"):
                     st.session_state.recibo_generado = None
