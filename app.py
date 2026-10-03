@@ -2186,19 +2186,25 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                     padding-bottom: 3mm;
                                 }}
-                                .ticket-container {{ 
-                                    text-align: left; 
-                                    font-family: 'Courier New', Courier, monospace; 
-                                    font-size: 14px; 
-                                    line-height: 1.35; 
-                                    font-weight: bold; 
-                                    white-space: pre; 
-                                    display: inline-block;
+                                .ticket-container {{
+                                    text-align: left;
+                                    font-family: 'Courier New', Courier, monospace;
+                                    font-size: 14px;
+                                    line-height: 1.35;
+                                    font-weight: bold;
+                                    color: #000000;
+                                    white-space: pre-wrap;
+                                    overflow-wrap: anywhere;
+                                    word-break: break-word;
+                                    display: block;
+                                    width: 100%;
+                                    max-width: 100%;
+                                    box-sizing: border-box;
                                     letter-spacing: -0.3px;
                                 }}
                             </style>
                             </head>
-                            <body onload="window.print()">
+                            <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                                 <div class="print-wrapper">
                                     {logo_copia_html}
                                     <div class="ticket-container">{ticket_copia_cliente}</div>
