@@ -1695,19 +1695,43 @@ if cfg['modo_taller'] == 1:
         # la ficha abierta no se vuelven a ejecutar cada 10 segundos.
         @st.fragment(run_every="10s")
         def mostrar_ordenes_actualizadas():
-            with st.container():
-                filtro_texto = st.text_input(
-                    "Buscar por Número de Orden, Nombre o Cédula:",
-                    placeholder="Ej: 15, Juan Pérez, 12345678...",
-                    key="filtro_orden_servicios",
+            busc_col1, busc_col2, busc_col3 = st.columns([1, 2, 2])
+            with busc_col1:
+                filtro_numero_orden = st.text_input(
+                    "Número de orden",
+                    placeholder="Ej: 34",
+                    key="filtro_numero_orden",
+                    help="Escribe 34 para buscar la orden #0034.",
+                )
+            with busc_col2:
+                filtro_nombre_cliente = st.text_input(
+                    "Nombre del cliente",
+                    placeholder="Ej: Juan Pérez",
+                    key="filtro_nombre_cliente",
+                )
+            with busc_col3:
+                filtro_cedula_cliente = st.text_input(
+                    "Cédula del cliente",
+                    placeholder="Ej: 12345678",
+                    key="filtro_cedula_cliente",
                 )
 
             conn = obtener_conexion()
             query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
             params = []
-            if filtro_texto:
-                query_base += " AND (id LIKE ? OR cliente LIKE ? OR cedula LIKE ?)"
-                params.extend([f"%{filtro_texto}%", f"%{filtro_texto}%", f"%{filtro_texto}%"])
+            numero_orden_limpio = str(filtro_numero_orden or "").strip()
+            if numero_orden_limpio:
+                if numero_orden_limpio.isdigit():
+                    query_base += " AND id = ?"
+                    params.append(int(numero_orden_limpio))
+                else:
+                    query_base += " AND 1 = 0"
+            if filtro_nombre_cliente.strip():
+                query_base += " AND cliente LIKE ?"
+                params.append(f"%{filtro_nombre_cliente.strip()}%")
+            if filtro_cedula_cliente.strip():
+                query_base += " AND cedula LIKE ?"
+                params.append(f"%{filtro_cedula_cliente.strip()}%")
             query_base += " ORDER BY id DESC"
             df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
             conn.close()
