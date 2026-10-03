@@ -1749,7 +1749,6 @@ if cfg['modo_taller'] == 1:
         # BANCO DE REPARACIÓN: se abre como ventana modal para no cargar debajo de la lista.
         @st.dialog("🛠️ Banco de reparación", width="large")
         def mostrar_ficha_modal(oid):
-            oid = st.session_state.ficha_orden_id
             conn = obtener_conexion()
             cursor = conn.cursor()
             cursor.execute("SELECT id, cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, fecha, firma_path FROM ordenes_servicio WHERE id = ?", (oid,))
@@ -1917,6 +1916,31 @@ if cfg['modo_taller'] == 1:
                     </div>
                 """, unsafe_allow_html=True)
 
+                st.markdown("##### 📝 Actualizar datos del servicio")
+                edit_col1, edit_col2 = st.columns(2)
+                with edit_col1:
+                    nueva_falla_edit = st.text_area(
+                        "Falla reportada / diagnóstico actualizado",
+                        value=str(ord_data[7] or ""),
+                        height=100,
+                        key=f"edit_falla_{oid}",
+                    )
+                    nueva_novedad_edit = st.text_area(
+                        "Agregar nueva falla o novedad (opcional)",
+                        value="",
+                        placeholder="Ejemplo: También presenta daño en el altavoz.",
+                        height=80,
+                        key=f"edit_novedad_{oid}",
+                    )
+                with edit_col2:
+                    nuevo_costo_edit = st.number_input(
+                        "Costo total actualizado ($)",
+                        min_value=0.0,
+                        value=float(ord_data[8] or 0.0),
+                        step=5000.0,
+                        key=f"edit_costo_{oid}",
+                    )
+
                 st.markdown("<br>##### 🔑 Seguridad (PIN, Patrón o Contraseña)")
                 
                 def renderizar_patron_imagen(secuencia_str, tamano=240):
@@ -1996,8 +2020,24 @@ if cfg['modo_taller'] == 1:
                             conn = obtener_conexion()
                             cursor = conn.cursor()
                             total_final_abono = c_abo + nuevo_abono_suma
-                            cursor.execute("UPDATE ordenes_servicio SET pin_patron=?, estado=?, abono=? WHERE id=?",
-                                           (nuevo_patron_edit, nuevo_estado_edit, total_final_abono, oid))
+                            falla_final = nueva_falla_edit.strip()
+                            if nueva_novedad_edit.strip():
+                                fecha_novedad = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M")
+                                falla_final = (
+                                    f"{falla_final}\n\n[Novedad {fecha_novedad}] "
+                                    f"{nueva_novedad_edit.strip()}"
+                                ).strip()
+                            cursor.execute(
+                                "UPDATE ordenes_servicio SET falla=?, costo=?, pin_patron=?, estado=?, abono=? WHERE id=?",
+                                (
+                                    falla_final,
+                                    float(nuevo_costo_edit),
+                                    nuevo_patron_edit,
+                                    nuevo_estado_edit,
+                                    total_final_abono,
+                                    oid,
+                                ),
+                            )
                             conn.commit()
                             conn.close()
                             # Preparar automáticamente el mensaje según el estado.
@@ -2072,7 +2112,8 @@ if cfg['modo_taller'] == 1:
         Cel: {cfg['telefono']}
 ==========================================
  ORDEN DE SERVICIO N°: {oid:04d}
- FECHA DE COPIA: {fecha_copia}
+ FECHA DE INGRESO: {ord_data[13]}
+ FECHA DE IMPRESIÓN: {fecha_copia}
 ------------------------------------------
  CLIENTE: {ord_data[1]}
  CÉDULA:  {ord_data[2]} | TEL: {ord_data[3]}
@@ -2145,8 +2186,11 @@ if cfg['modo_taller'] == 1:
                         """, height=0)
 
 
-        if st.session_state.ficha_orden_id:
-            mostrar_ficha_modal(st.session_state.ficha_orden_id)
+        # Consumir el ID una sola vez. Así, al cerrar el diálogo, una ejecución
+        # posterior del fragmento automático no vuelve a abrir la misma ficha.
+        ficha_a_mostrar = st.session_state.pop("ficha_orden_id", None)
+        if ficha_a_mostrar:
+            mostrar_ficha_modal(ficha_a_mostrar)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
