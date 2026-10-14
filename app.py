@@ -492,6 +492,9 @@ def inicializar_bd():
         "ALTER TABLE ventas ADD COLUMN imei1 TEXT",
         "ALTER TABLE ventas ADD COLUMN imei2 TEXT",
         "ALTER TABLE ventas ADD COLUMN notas TEXT",
+        "ALTER TABLE ventas ADD COLUMN cliente TEXT",
+        "ALTER TABLE ventas ADD COLUMN cedula TEXT",
+        "ALTER TABLE ventas ADD COLUMN telefono TEXT",
         "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT"
     ]:
         try:
@@ -568,7 +571,7 @@ with enc_col2:
     ):
         st.rerun(scope="app")
 
-tabs_labels = ["🛒 Módulo de Ventas", "📦 Inventario"]
+tabs_labels = ["🛒 Módulo de Ventas", "📊 Historial de Ventas", "📦 Inventario"]
 if cfg['modo_taller'] == 1:
     tabs_labels.append("➕ Crear Orden")
     tabs_labels.append("🛠️ Servicios")
@@ -763,8 +766,23 @@ with tabs[0]:
 
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
-                        cursor.execute("INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (itm['codigo'], itm['nombre'], itm['cantidad'], itm['total'], v_imei1, v_imei2, 1 if check_prestamo else 0, v_notas, fecha_ahora))
+                        cursor.execute(
+                            "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                itm['codigo'],
+                                itm['nombre'],
+                                itm['cantidad'],
+                                itm['total'],
+                                v_imei1,
+                                v_imei2,
+                                1 if check_prestamo else 0,
+                                v_notas,
+                                fecha_ahora,
+                                v_nombre_cliente or "CONSUMIDOR FINAL",
+                                v_cedula or "N/A",
+                                v_telefono or "N/A",
+                            ),
+                        )
                     conn.commit()
                     conn.close()
 
@@ -914,9 +932,102 @@ with tabs[0]:
                     st.rerun()
 
 # =========================================================
-# 📦 PESTAÑA: INVENTARIO
+# 📊 PESTAÑA: HISTORIAL DE VENTAS
 # =========================================================
 with tabs[1]:
+    st.markdown('<div class="jd-card">', unsafe_allow_html=True)
+    st.subheader("📊 Historial de Ventas")
+    st.caption("Consulta las ventas registradas en Turso y controla los productos vendidos, clientes y totales.")
+
+    hist_col1, hist_col2, hist_col3 = st.columns([1, 1, 2])
+    with hist_col1:
+        fecha_hist_desde = st.date_input(
+            "Desde",
+            value=datetime.date.today(),
+            key="hist_fecha_desde",
+        )
+    with hist_col2:
+        fecha_hist_hasta = st.date_input(
+            "Hasta",
+            value=datetime.date.today(),
+            key="hist_fecha_hasta",
+        )
+    with hist_col3:
+        texto_historial = st.text_input(
+            "Buscar cliente, cédula, producto o código",
+            placeholder="Ej: Juan, 123456, pantalla...",
+            key="hist_busqueda_ventas",
+        )
+
+    if fecha_hist_desde > fecha_hist_hasta:
+        st.warning("La fecha inicial no puede ser posterior a la fecha final.")
+    else:
+        conn_hist = obtener_conexion()
+        query_hist = """
+            SELECT
+                fecha AS Fecha,
+                cliente AS Cliente,
+                cedula AS Cédula,
+                telefono AS Teléfono,
+                codigo AS Código,
+                nombre AS Producto,
+                cantidad AS Cantidad,
+                total AS Total,
+                CASE WHEN prestamo = 1 THEN 'Sí' ELSE 'No' END AS Préstamo,
+                notas AS Notas
+            FROM ventas
+            WHERE fecha >= ? AND fecha <= ?
+        """
+        params_hist = [
+            fecha_hist_desde.strftime("%Y-%m-%d") + " 00:00:00",
+            fecha_hist_hasta.strftime("%Y-%m-%d") + " 23:59:59",
+        ]
+        texto_historial_limpio = texto_historial.strip()
+        if texto_historial_limpio:
+            query_hist += " AND (cliente LIKE ? OR cedula LIKE ? OR nombre LIKE ? OR codigo LIKE ?)"
+            busqueda_hist = f"%{texto_historial_limpio}%"
+            params_hist.extend([busqueda_hist] * 4)
+        query_hist += " ORDER BY fecha DESC, id DESC"
+        df_historial = consultar_dataframe(conn_hist, query_hist, params_hist)
+        conn_hist.close()
+
+        if df_historial.empty:
+            st.info("No hay ventas registradas en el periodo o filtro seleccionado.")
+        else:
+            total_historial = float(pd.to_numeric(df_historial["Total"], errors="coerce").fillna(0).sum())
+            unidades_historial = int(pd.to_numeric(df_historial["Cantidad"], errors="coerce").fillna(0).sum())
+            resumen_h1, resumen_h2, resumen_h3 = st.columns(3)
+            with resumen_h1:
+                st.metric("Registros de venta", len(df_historial))
+            with resumen_h2:
+                st.metric("Unidades vendidas", unidades_historial)
+            with resumen_h3:
+                st.metric("Total vendido", f"${total_historial:,.2f}")
+
+            df_historial["Total"] = pd.to_numeric(df_historial["Total"], errors="coerce").fillna(0)
+            st.dataframe(
+                df_historial,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Total": st.column_config.NumberColumn("Total", format="$ %.2f"),
+                    "Cantidad": st.column_config.NumberColumn("Cantidad", format="%d"),
+                },
+            )
+            st.download_button(
+                "📥 Descargar historial en CSV",
+                data=df_historial.to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"historial_ventas_{fecha_hist_desde}_{fecha_hist_hasta}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="descargar_historial_ventas",
+            )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================================================
+# 📦 PESTAÑA: INVENTARIO
+# =========================================================
+with tabs[2]:
     st.markdown('<div class="jd-card">', unsafe_allow_html=True)
     st.markdown("##### 🔍 BUSCAR PRODUCTO")
     inv_busqueda = st.text_input("Nombre o código...", placeholder="Nombre o código...", label_visibility="collapsed", key="inv_busq_input")
@@ -1225,7 +1336,7 @@ with tabs[1]:
 # ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (AUTORRELLENO BLINDADO CON STATE)
 # =========================================================
 if cfg['modo_taller'] == 1:
-    with tabs[2]:
+    with tabs[3]:
         if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
             col_tlg1, col_tlg2, col_tlg3 = st.columns([2, 1, 2])
             with col_tlg2:
@@ -1666,7 +1777,7 @@ if cfg['modo_taller'] == 1:
 # 🛠️ PESTAÑA: SERVICIOS (GESTIÓN Y BANCO DE REPARACIÓN)
 # =========================================================
 if cfg['modo_taller'] == 1:
-    with tabs[3]:
+    with tabs[4]:
         if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
             col_tlg1, col_tlg2, col_tlg3 = st.columns([2, 1, 2])
             with col_tlg2:
