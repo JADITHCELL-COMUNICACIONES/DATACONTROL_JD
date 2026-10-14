@@ -768,6 +768,9 @@ with tabs[0]:
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     venta_ref = obtener_tiempo_colombia().strftime("%Y%m%d%H%M%S%f")
+                    cliente_venta = str(v_nombre_cliente or "").strip() or "CONSUMIDOR FINAL"
+                    cedula_venta = str(v_cedula or "").strip() or "N/A"
+                    telefono_venta = str(v_telefono or "").strip() or "N/A"
 
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
@@ -783,9 +786,9 @@ with tabs[0]:
                                 1 if check_prestamo else 0,
                                 v_notas,
                                 fecha_ahora,
-                                v_nombre_cliente or "CONSUMIDOR FINAL",
-                                v_cedula or "N/A",
-                                v_telefono or "N/A",
+                                cliente_venta,
+                                cedula_venta,
+                                telefono_venta,
                                 venta_ref,
                                 v_recibido if v_recibido > 0 else subtotal_calc,
                                 max((v_recibido if v_recibido > 0 else subtotal_calc) - subtotal_calc, 0.0),
@@ -975,9 +978,9 @@ with tabs[1]:
             SELECT
                 fecha AS Fecha,
                 COALESCE(NULLIF(venta_ref, ''), fecha) AS RefVenta,
-                cliente AS Cliente,
-                cedula AS Cédula,
-                telefono AS Teléfono,
+                COALESCE(NULLIF(cliente, ''), 'CONSUMIDOR FINAL') AS Cliente,
+                COALESCE(NULLIF(cedula, ''), 'N/A') AS Cédula,
+                COALESCE(NULLIF(telefono, ''), 'N/A') AS Teléfono,
                 codigo AS Código,
                 nombre AS Producto,
                 cantidad AS Cantidad,
