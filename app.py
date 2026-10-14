@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import hashlib
 import zipfile
+from html import escape
 
 
 # --- COMPONENTE DE PATRÓN SEGURO ---
@@ -495,6 +496,9 @@ def inicializar_bd():
         "ALTER TABLE ventas ADD COLUMN cliente TEXT",
         "ALTER TABLE ventas ADD COLUMN cedula TEXT",
         "ALTER TABLE ventas ADD COLUMN telefono TEXT",
+        "ALTER TABLE ventas ADD COLUMN venta_ref TEXT",
+        "ALTER TABLE ventas ADD COLUMN recibido REAL DEFAULT 0",
+        "ALTER TABLE ventas ADD COLUMN vuelto REAL DEFAULT 0",
         "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT"
     ]:
         try:
@@ -763,11 +767,12 @@ with tabs[0]:
                     conn = obtener_conexion()
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                    venta_ref = obtener_tiempo_colombia().strftime("%Y%m%d%H%M%S%f")
 
                     for itm in st.session_state.carrito:
                         cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
                         cursor.execute(
-                            "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono, venta_ref, recibido, vuelto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
                                 itm['codigo'],
                                 itm['nombre'],
@@ -781,6 +786,9 @@ with tabs[0]:
                                 v_nombre_cliente or "CONSUMIDOR FINAL",
                                 v_cedula or "N/A",
                                 v_telefono or "N/A",
+                                venta_ref,
+                                v_recibido if v_recibido > 0 else subtotal_calc,
+                                max((v_recibido if v_recibido > 0 else subtotal_calc) - subtotal_calc, 0.0),
                             ),
                         )
                     conn.commit()
@@ -966,6 +974,7 @@ with tabs[1]:
         query_hist = """
             SELECT
                 fecha AS Fecha,
+                COALESCE(NULLIF(venta_ref, ''), fecha) AS RefVenta,
                 cliente AS Cliente,
                 cedula AS Cédula,
                 telefono AS Teléfono,
@@ -973,6 +982,9 @@ with tabs[1]:
                 nombre AS Producto,
                 cantidad AS Cantidad,
                 total AS Total,
+                recibido AS Recibido,
+                vuelto AS Cambio,
+                imei1 AS IMEI,
                 CASE WHEN prestamo = 1 THEN 'Sí' ELSE 'No' END AS Préstamo,
                 notas AS Notas
             FROM ventas
@@ -1005,6 +1017,8 @@ with tabs[1]:
                 st.metric("Total vendido", f"${total_historial:,.2f}")
 
             df_historial["Total"] = pd.to_numeric(df_historial["Total"], errors="coerce").fillna(0)
+            df_historial["Recibido"] = pd.to_numeric(df_historial["Recibido"], errors="coerce").fillna(0)
+            df_historial["Cambio"] = pd.to_numeric(df_historial["Cambio"], errors="coerce").fillna(0)
             st.dataframe(
                 df_historial,
                 use_container_width=True,
@@ -1014,6 +1028,87 @@ with tabs[1]:
                     "Cantidad": st.column_config.NumberColumn("Cantidad", format="%d"),
                 },
             )
+
+            st.markdown("##### 🧾 Reimprimir recibo de una venta")
+            ventas_disponibles = {}
+            for ref_venta, grupo_venta in df_historial.groupby("RefVenta", sort=False):
+                primera_fila = grupo_venta.iloc[0]
+                total_venta = float(grupo_venta["Total"].sum())
+                cliente_venta = primera_fila["Cliente"] or "CONSUMIDOR FINAL"
+                etiqueta_venta = (
+                    f"{primera_fila['Fecha']} — {cliente_venta} — "
+                    f"${total_venta:,.2f}"
+                )
+                ventas_disponibles[etiqueta_venta] = (ref_venta, grupo_venta.copy())
+
+            venta_seleccionada = st.selectbox(
+                "Seleccione la venta completa que desea reimprimir:",
+                options=list(ventas_disponibles.keys()),
+                key="hist_venta_seleccionada",
+            )
+            if st.button("🖨️ Reimprimir recibo completo", type="primary", use_container_width=True, key="hist_reimprimir_venta"):
+                _, venta_rows = ventas_disponibles[venta_seleccionada]
+                primera_fila = venta_rows.iloc[0]
+                total_reimpresion = float(venta_rows["Total"].sum())
+                recibido_reimpresion = float(primera_fila["Recibido"] or total_reimpresion)
+                cambio_reimpresion = float(primera_fila["Cambio"] or 0.0)
+                lineas_reimpresion = [
+                    "==========================================",
+                    f"        {cfg['empresa']}",
+                    f"       {cfg['propietario']}",
+                    f"       NIT / CC: {cfg['nit']}",
+                    f"        {cfg['direccion']}",
+                    f"        Cel: {cfg['telefono']}",
+                    "==========================================",
+                    " TICKET DE VENTA - COPIA",
+                    f" FECHA: {primera_fila['Fecha']}",
+                    "------------------------------------------",
+                    f" CLIENTE: {primera_fila['Cliente'] or 'CONSUMIDOR FINAL'}",
+                    f" CÉDULA:  {primera_fila['Cédula'] or 'N/A'} | TEL: {primera_fila['Teléfono'] or 'N/A'}",
+                    "------------------------------------------",
+                    "CANT PRODUCTO         TOTAL",
+                    "------------------------------------------",
+                ]
+                for _, item_venta in venta_rows.iterrows():
+                    lineas_reimpresion.append(
+                        f"{int(item_venta['Cantidad']):<2} {str(item_venta['Producto'])[:15]:<16} ${float(item_venta['Total']):>15,.2f}"
+                    )
+                lineas_reimpresion.extend([
+                    "------------------------------------------",
+                    f" TOTAL:            ${total_reimpresion:>18,.2f}",
+                    f" RECIBIDO:         ${recibido_reimpresion:>18,.2f}",
+                    f" CAMBIO:           ${cambio_reimpresion:>18,.2f}",
+                    "==========================================",
+                    f" IMEI 1: {primera_fila['IMEI']}" if primera_fila['IMEI'] else "",
+                    f" {cfg['garantia']}",
+                    "------------------------------------------",
+                    "         ¡GRACIAS POR PREFERIRNOS!",
+                    "==========================================",
+                ])
+                ticket_reimpresion = "\n".join(lineas_reimpresion)
+                logo_reimpresion = ""
+                if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
+                    try:
+                        with open(cfg['logo_path'], "rb") as archivo_logo:
+                            logo_reimpresion = base64.b64encode(archivo_logo.read()).decode("utf-8")
+                    except Exception:
+                        logo_reimpresion = ""
+                logo_reimpresion_html = (
+                    f'<div style="text-align:center;margin:2px 0 6px 0;">'
+                    f'<img src="data:image/png;base64,{logo_reimpresion}" style="width:90px;height:90px;object-fit:contain;display:block;margin:0 auto;" /></div>'
+                    if logo_reimpresion else ""
+                )
+                components.html(f"""
+                    <html><head><style>
+                        @page {{ size: 80mm auto; margin: 0; }}
+                        html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
+                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 3mm; }}
+                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.35; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; box-sizing: border-box; letter-spacing: -0.3px; }}
+                    </style></head>
+                    <body onload="setTimeout(function() {{ window.print(); }}, 250)">
+                        <div class="print-wrapper">{logo_reimpresion_html}<div class="ticket-container">{escape(ticket_reimpresion)}</div></div>
+                    </body></html>
+                """, height=0)
             st.download_button(
                 "📥 Descargar historial en CSV",
                 data=df_historial.to_csv(index=False).encode("utf-8-sig"),
