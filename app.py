@@ -1964,6 +1964,12 @@ if cfg['modo_taller'] == 1:
                         step=5000.0,
                         key=f"edit_costo_{oid}",
                     )
+                    nuevo_telefono_edit = st.text_input(
+                        "Número de contacto / WhatsApp",
+                        value=str(ord_data[3] or ""),
+                        placeholder="Ej: 3001234567",
+                        key=f"edit_telefono_{oid}",
+                    )
 
                 st.markdown("<br>##### 🔑 Seguridad (PIN, Patrón o Contraseña)")
                 
@@ -2052,10 +2058,11 @@ if cfg['modo_taller'] == 1:
                                     f"{nueva_novedad_edit.strip()}"
                                 ).strip()
                             cursor.execute(
-                                "UPDATE ordenes_servicio SET falla=?, costo=?, pin_patron=?, estado=?, abono=? WHERE id=?",
+                                "UPDATE ordenes_servicio SET falla=?, costo=?, telefono=?, pin_patron=?, estado=?, abono=? WHERE id=?",
                                 (
                                     falla_final,
                                     float(nuevo_costo_edit),
+                                    nuevo_telefono_edit.strip(),
                                     nuevo_patron_edit,
                                     nuevo_estado_edit,
                                     total_final_abono,
@@ -2092,7 +2099,7 @@ if cfg['modo_taller'] == 1:
                                 ),
                             }
                             mensaje_estado = mensajes_estado.get(nuevo_estado_edit)
-                            telefono_cliente = re.sub(r"\D", "", str(ord_data[3] or ""))
+                            telefono_cliente = re.sub(r"\D", "", str(nuevo_telefono_edit or ""))
                             st.session_state.ficha_orden_id = None
 
                             if mensaje_estado and telefono_cliente:
