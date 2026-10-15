@@ -2165,6 +2165,13 @@ if cfg['modo_taller'] == 1:
                         height=80,
                         key=f"edit_novedad_{oid}",
                     )
+                    nuevas_notas_edit = st.text_area(
+                        "Notas adicionales / Chequeo físico",
+                        value=str(ord_data[12] or ""),
+                        placeholder="Ejemplo: Equipo ingresa con rayones en la tapa y pantalla partida.",
+                        height=110,
+                        key=f"edit_notas_{oid}",
+                    )
                 with edit_col2:
                     nuevo_costo_edit = st.number_input(
                         "Costo total actualizado ($)",
@@ -2267,11 +2274,12 @@ if cfg['modo_taller'] == 1:
                                     f"{nueva_novedad_edit.strip()}"
                                 ).strip()
                             cursor.execute(
-                                "UPDATE ordenes_servicio SET falla=?, costo=?, telefono=?, pin_patron=?, estado=?, abono=? WHERE id=?",
+                                "UPDATE ordenes_servicio SET falla=?, costo=?, telefono=?, detalles_chequeo=?, pin_patron=?, estado=?, abono=? WHERE id=?",
                                 (
                                     falla_final,
                                     float(nuevo_costo_edit),
                                     nuevo_telefono_edit.strip(),
+                                    nuevas_notas_edit.strip(),
                                     nuevo_patron_edit,
                                     nuevo_estado_edit,
                                     total_final_abono,
