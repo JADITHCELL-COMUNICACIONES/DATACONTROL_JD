@@ -867,6 +867,7 @@ with tabs[0]:
                 f" CAMBIO:           ${rg['vuelto']:>18,.2f}",
                 f"==========================================",
                 f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
+                f" NOTAS DEL PEDIDO:\n {rg['notas']}" if rg.get('notas') else "",
                 f" {cfg['garantia']}",
                 f"------------------------------------------",
                 f"         ¡GRACIAS POR PREFERIRNOS!",
@@ -1083,6 +1084,7 @@ with tabs[1]:
                     f" CAMBIO:           ${cambio_reimpresion:>18,.2f}",
                     "==========================================",
                     f" IMEI 1: {primera_fila['IMEI']}" if primera_fila['IMEI'] else "",
+                    f" NOTAS DEL PEDIDO:\n {primera_fila['Notas']}" if primera_fila['Notas'] else "",
                     f" {cfg['garantia']}",
                     "------------------------------------------",
                     "         ¡GRACIAS POR PREFERIRNOS!",
@@ -2025,7 +2027,7 @@ if cfg['modo_taller'] == 1:
                 )
                 telefono_personalizado = re.sub(r"\D", "", str(ord_data[3] or ""))
                 mensaje_personalizado_limpio = mensaje_personalizado.strip()
-                if telefono_personalizado and mensaje_personalizado_limpio:
+                if telefono_personalizado:
                     url_mensaje_personalizado = (
                         f"https://api.whatsapp.com/send?phone=57{telefono_personalizado}"
                         f"&text={quote(mensaje_personalizado_limpio)}"
@@ -2034,8 +2036,8 @@ if cfg['modo_taller'] == 1:
                         f'''<a href="{escape(url_mensaje_personalizado, quote=True)}" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;background:#16a34a;color:white;padding:0.65rem 1rem;border-radius:0.5rem;font-weight:700;margin-top:0.5rem;">📤 Enviar al cliente por WhatsApp</a>''',
                         unsafe_allow_html=True,
                     )
-                elif telefono_personalizado:
-                    st.info("Escriba un mensaje arriba para habilitar el botón de envío.")
+                    if not mensaje_personalizado_limpio:
+                        st.caption("Escriba el mensaje arriba antes de pulsar el botón.")
                 elif not telefono_personalizado:
                     st.warning("Esta orden no tiene un número telefónico válido para WhatsApp.")
 
