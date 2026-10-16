@@ -2024,18 +2024,18 @@ if cfg['modo_taller'] == 1:
                     key=f"mensaje_personalizado_{oid}",
                 )
                 telefono_personalizado = re.sub(r"\D", "", str(ord_data[3] or ""))
-                if telefono_personalizado:
+                mensaje_personalizado_limpio = mensaje_personalizado.strip()
+                if telefono_personalizado and mensaje_personalizado_limpio:
                     url_mensaje_personalizado = (
                         f"https://api.whatsapp.com/send?phone=57{telefono_personalizado}"
-                        f"&text={quote(mensaje_personalizado.strip())}"
+                        f"&text={quote(mensaje_personalizado_limpio)}"
                     )
-                    st.link_button(
-                        "📤 Enviar al cliente por WhatsApp",
-                        url_mensaje_personalizado,
-                        use_container_width=True,
+                    st.markdown(
+                        f'''<a href="{escape(url_mensaje_personalizado, quote=True)}" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;background:#16a34a;color:white;padding:0.65rem 1rem;border-radius:0.5rem;font-weight:700;margin-top:0.5rem;">📤 Enviar al cliente por WhatsApp</a>''',
+                        unsafe_allow_html=True,
                     )
-                    if not mensaje_personalizado.strip():
-                        st.caption("Escriba un mensaje arriba antes de pulsar el botón de envío.")
+                elif telefono_personalizado:
+                    st.info("Escriba un mensaje arriba para habilitar el botón de envío.")
                 elif not telefono_personalizado:
                     st.warning("Esta orden no tiene un número telefónico válido para WhatsApp.")
 
