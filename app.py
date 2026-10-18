@@ -499,6 +499,8 @@ def inicializar_bd():
         "ALTER TABLE ventas ADD COLUMN venta_ref TEXT",
         "ALTER TABLE ventas ADD COLUMN recibido REAL DEFAULT 0",
         "ALTER TABLE ventas ADD COLUMN vuelto REAL DEFAULT 0",
+        "ALTER TABLE ventas ADD COLUMN orden_id INTEGER",
+        "ALTER TABLE ventas ADD COLUMN tipo_venta TEXT DEFAULT 'VENTA DIRECTA'",
         "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT"
     ]:
         try:
@@ -555,6 +557,7 @@ if 'firma_secuencia' not in st.session_state: st.session_state.firma_secuencia =
 if 'form_counter' not in st.session_state: st.session_state.form_counter = 0
 if 'venta_form_counter' not in st.session_state: st.session_state.venta_form_counter = 0
 if 'confirmar_borrado_inv' not in st.session_state: st.session_state.confirmar_borrado_inv = False
+if 'materiales_orden' not in st.session_state: st.session_state.materiales_orden = []
 
 fc = st.session_state.form_counter
 
@@ -989,6 +992,8 @@ with tabs[1]:
                 recibido AS Recibido,
                 vuelto AS Cambio,
                 imei1 AS IMEI,
+                orden_id AS Orden,
+                COALESCE(NULLIF(tipo_venta, ''), 'VENTA DIRECTA') AS Tipo,
                 CASE WHEN prestamo = 1 THEN 'Sí' ELSE 'No' END AS Préstamo,
                 notas AS Notas
             FROM ventas
@@ -1559,6 +1564,83 @@ if cfg['modo_taller'] == 1:
             ot_patron_txt = st.text_input("Patrón, PIN o Contraseña", placeholder="Patrón, PIN o Contraseña", key=f"t_pat_{fc}")
 
         st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
+        st.markdown("<div class='lbl-celeste'>📦 Productos utilizados en la reparación</div>", unsafe_allow_html=True)
+        st.caption("Selecciona el producto por código o nombre. Al guardar la orden se descontará del inventario y quedará registrado en el historial.")
+        conn_mat = obtener_conexion()
+        cur_mat = conn_mat.cursor()
+        cur_mat.execute("SELECT id, codigo, nombre, precio_venta, stock FROM productos WHERE stock > 0 ORDER BY nombre ASC")
+        productos_materiales = cur_mat.fetchall()
+        conn_mat.close()
+
+        opciones_materiales = {"-- No agregar producto --": None}
+        for producto in productos_materiales:
+            producto_id, producto_codigo, producto_nombre, producto_precio, producto_stock = producto
+            etiqueta_producto = (
+                f"{producto_codigo or 'SIN CÓDIGO'} — {producto_nombre} "
+                f"(${float(producto_precio or 0):,.2f}, stock: {int(producto_stock or 0)})"
+            )
+            opciones_materiales[etiqueta_producto] = producto
+
+        mat_col1, mat_col2, mat_col3 = st.columns([3, 1, 1])
+        with mat_col1:
+            material_seleccionado = st.selectbox(
+                "Producto del inventario",
+                options=list(opciones_materiales.keys()),
+                key=f"material_select_{fc}",
+            )
+        producto_actual = opciones_materiales.get(material_seleccionado)
+        stock_actual_material = int(producto_actual[4] or 0) if producto_actual else 1
+        with mat_col2:
+            cantidad_material = st.number_input(
+                "Cantidad",
+                min_value=1,
+                max_value=max(stock_actual_material, 1),
+                value=1,
+                step=1,
+                key=f"material_cantidad_{fc}",
+            )
+        with mat_col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("➕ Agregar", key=f"agregar_material_{fc}", use_container_width=True):
+                if producto_actual:
+                    material_id, material_codigo, material_nombre, material_precio, material_stock = producto_actual
+                    existente = next((m for m in st.session_state.materiales_orden if m["id"] == material_id), None)
+                    cantidad_nueva = int(cantidad_material) + (int(existente["cantidad"]) if existente else 0)
+                    if cantidad_nueva > int(material_stock or 0):
+                        st.error(f"Stock insuficiente. Disponible: {int(material_stock or 0)}.")
+                    else:
+                        if existente:
+                            existente["cantidad"] = cantidad_nueva
+                            existente["total"] = cantidad_nueva * float(material_precio or 0)
+                        else:
+                            st.session_state.materiales_orden.append({
+                                "id": material_id,
+                                "codigo": material_codigo or "",
+                                "nombre": material_nombre or "",
+                                "precio": float(material_precio or 0),
+                                "cantidad": int(cantidad_material),
+                                "total": int(cantidad_material) * float(material_precio or 0),
+                            })
+                        st.rerun()
+
+        if st.session_state.materiales_orden:
+            total_materiales_orden = sum(float(m["total"]) for m in st.session_state.materiales_orden)
+            for indice_material, material in enumerate(st.session_state.materiales_orden):
+                material_col1, material_col2, material_col3 = st.columns([4, 1, 1])
+                with material_col1:
+                    st.write(f"{material['codigo']} — {material['nombre']}")
+                with material_col2:
+                    st.write(f"{material['cantidad']} × ${material['precio']:,.2f}")
+                with material_col3:
+                    if st.button("❌", key=f"quitar_material_{fc}_{indice_material}"):
+                        st.session_state.materiales_orden.pop(indice_material)
+                        st.rerun()
+            st.markdown(f"**Total de materiales registrados:** ${total_materiales_orden:,.2f}")
+        else:
+            st.info("No hay productos agregados a esta orden.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="jd-card-inner">', unsafe_allow_html=True)
         st.markdown("<div class='lbl-celeste'>🔐 Dibujar Patrón de Desbloqueo (Opcional)</div>", unsafe_allow_html=True)
         patron_col_1, patron_col_2 = st.columns([3, 1])
         with patron_col_1:
@@ -1627,10 +1709,20 @@ if cfg['modo_taller'] == 1:
                     conn = obtener_conexion()
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                    for material in st.session_state.materiales_orden:
+                        cursor.execute("SELECT stock FROM productos WHERE id = ?", (material["id"],))
+                        fila_stock = cursor.fetchone()
+                        stock_disponible = int(fila_stock[0] or 0) if fila_stock else 0
+                        if stock_disponible < int(material["cantidad"]):
+                            conn.close()
+                            st.error(
+                                f"Stock insuficiente para {material['nombre']}. "
+                                f"Disponible: {stock_disponible}."
+                            )
+                            st.stop()
                     cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                                    (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
-                    conn.commit()
                     
                     # Obtener el ID real asignado por la base de datos.
                     # Con Turso/libSQL, last_insert_rowid() puede devolver 0 aunque
@@ -1644,6 +1736,37 @@ if cfg['modo_taller'] == 1:
                         raise RuntimeError("No se pudo obtener el número de la orden creada.")
                     nueva_id = int(nueva_id)
 
+                    if st.session_state.materiales_orden:
+                        referencia_materiales = f"ORDEN-{nueva_id:04d}-{fecha_ahora.replace('-', '').replace(':', '').replace(' ', '')}"
+                        notas_materiales = f"Material utilizado en la Orden #{nueva_id:04d}"
+                        for material in st.session_state.materiales_orden:
+                            cursor.execute(
+                                "UPDATE productos SET stock = stock - ? WHERE id = ? AND stock >= ?",
+                                (int(material["cantidad"]), material["id"], int(material["cantidad"])),
+                            )
+                            cursor.execute(
+                                "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono, venta_ref, recibido, vuelto, orden_id, tipo_venta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (
+                                    material["codigo"],
+                                    material["nombre"],
+                                    int(material["cantidad"]),
+                                    float(material["total"]),
+                                    ot_imei,
+                                    "",
+                                    0,
+                                    notas_materiales,
+                                    fecha_ahora,
+                                    ot_cliente.strip(),
+                                    ot_cedula.strip() or "N/A",
+                                    ot_tel.strip() or "N/A",
+                                    referencia_materiales,
+                                    0.0,
+                                    0.0,
+                                    nueva_id,
+                                    "MATERIAL REPARACION",
+                                ),
+                            )
+
                     for foto in fotos_ingreso or []:
                         contenido_foto = foto.getvalue()
                         if contenido_foto:
@@ -1653,6 +1776,8 @@ if cfg['modo_taller'] == 1:
                             )
                     conn.commit()
                     conn.close()
+                    materiales_guardados = [dict(material) for material in st.session_state.materiales_orden]
+                    st.session_state.materiales_orden = []
 
                     telefono_nueva_orden = re.sub(r"\D", "", str(ot_tel or ""))
                     if telefono_nueva_orden:
@@ -1682,7 +1807,8 @@ if cfg['modo_taller'] == 1:
                         "id": nueva_id, "cliente": ot_cliente, "cedula": ot_cedula, "telefono": ot_tel,
                         "equipo": ot_equipo, "imei": ot_imei, "falla": ot_falla, "costo": val_costo,
                         "abono": val_abono, "estado": "PENDIENTE", "patron": patron_guardar,
-                        "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar
+                        "chequeo": ot_notas, "fecha": fecha_ahora, "firma": firma_guardar,
+                        "materiales": materiales_guardados,
                     }
                     st.rerun()
                 else:
@@ -1721,6 +1847,14 @@ if cfg['modo_taller'] == 1:
                 rt_abono = 0.0
             saldo_r = rt_costo - rt_abono
             fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+            materiales_ticket = "\n".join(
+                f" {material['cantidad']} x {material['nombre'][:24]} ${float(material['total']):,.2f}"
+                for material in rt.get("materiales", [])
+            )
+            bloque_materiales_ticket = (
+                f"\n PRODUCTOS UTILIZADOS:\n{materiales_ticket}\n------------------------------------------"
+                if materiales_ticket else ""
+            )
 
             with st.expander(f"🧾 RECIBO BÁSICO ORDEN #{rt_id:04d} — LISTO PARA IMPRIMIR", expanded=True):
                 if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
@@ -1742,11 +1876,12 @@ if cfg['modo_taller'] == 1:
  CLIENTE: {rt['cliente']}
  CÉDULA:  {rt['cedula']} | TEL: {rt['telefono']}
  EQUIPO:  {rt['equipo']}
- IMEI:    {rt['imei']}
- FALLA:   {rt['falla']}
- SEGURIDAD/PATRÓN: {rt['patron']}
- NOTAS:   {rt['chequeo']}
-------------------------------------------
+	IMEI:    {rt['imei']}
+	FALLA:   {rt['falla']}
+	SEGURIDAD/PATRÓN: {rt['patron']}
+	NOTAS:   {rt['chequeo']}
+	{bloque_materiales_ticket}
+	------------------------------------------
  COSTO TOTAL:       ${rt_costo:,.2f}
  TOTAL ABONADO:     ${rt_abono:,.2f}
  SALDO PENDIENTE:   ${saldo_r:,.2f}
