@@ -1848,7 +1848,7 @@ if cfg['modo_taller'] == 1:
             saldo_r = rt_costo - rt_abono
             fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             materiales_ticket = "\n".join(
-                f" {material['cantidad']} x {material['nombre'][:24]} ${float(material['total']):,.2f}"
+                f" {material['cantidad']} x {material['nombre'][:30]}"
                 for material in rt.get("materiales", [])
             )
             bloque_materiales_ticket = (
@@ -2285,6 +2285,113 @@ if cfg['modo_taller'] == 1:
                         <div><span style="color: #94a3b8; font-size: 12px;">SALDO PENDIENTE</span><br><span style="color: #facc15; font-size: 18px; font-weight: bold;">${c_pen:,.2f}</span></div>
                     </div>
                 """, unsafe_allow_html=True)
+
+                st.markdown("##### 📦 Materiales utilizados en esta reparación")
+                conn_mat_ficha = obtener_conexion()
+                cur_mat_ficha = conn_mat_ficha.cursor()
+                cur_mat_ficha.execute(
+                    "SELECT id, codigo, nombre, cantidad, total, venta_ref FROM ventas WHERE orden_id = ? AND tipo_venta = 'MATERIAL REPARACION' ORDER BY id ASC",
+                    (oid,),
+                )
+                materiales_ficha = cur_mat_ficha.fetchall()
+                cur_mat_ficha.execute("SELECT id, codigo, nombre, precio_venta, stock FROM productos WHERE stock > 0 ORDER BY nombre ASC")
+                productos_ficha = cur_mat_ficha.fetchall()
+                conn_mat_ficha.close()
+
+                if materiales_ficha:
+                    st.caption("Los valores de los materiales son internos y no aparecen en el recibo del cliente.")
+                    for material_id_venta, codigo_material, nombre_material, cantidad_material, total_material, _ in materiales_ficha:
+                        mat_fila_1, mat_fila_2, mat_fila_3 = st.columns([4, 1, 1])
+                        with mat_fila_1:
+                            st.write(f"{codigo_material or 'SIN CÓDIGO'} — {nombre_material}")
+                        with mat_fila_2:
+                            st.write(f"Cantidad: {int(cantidad_material or 0)}")
+                        with mat_fila_3:
+                            if st.button("↩️ Devolver", key=f"devolver_material_{material_id_venta}", use_container_width=True):
+                                conn_dev = obtener_conexion()
+                                cur_dev = conn_dev.cursor()
+                                cur_dev.execute("UPDATE productos SET stock = stock + ? WHERE codigo = ?", (int(cantidad_material or 0), codigo_material))
+                                cur_dev.execute("DELETE FROM ventas WHERE id = ?", (material_id_venta,))
+                                conn_dev.commit()
+                                conn_dev.close()
+                                st.success(f"{nombre_material} devuelto al inventario.")
+                                st.rerun()
+                else:
+                    st.info("Esta orden todavía no tiene materiales registrados.")
+
+                opciones_materiales_ficha = {"-- Seleccionar producto --": None}
+                for producto_ficha in productos_ficha:
+                    producto_id_f, codigo_f, nombre_f, precio_f, stock_f = producto_ficha
+                    opciones_materiales_ficha[
+                        f"{codigo_f or 'SIN CÓDIGO'} — {nombre_f} (${float(precio_f or 0):,.2f}, stock: {int(stock_f or 0)})"
+                    ] = producto_ficha
+                agregar_col1, agregar_col2, agregar_col3 = st.columns([3, 1, 1])
+                with agregar_col1:
+                    producto_ficha_seleccionado = st.selectbox(
+                        "Agregar material adicional",
+                        options=list(opciones_materiales_ficha.keys()),
+                        key=f"producto_adicional_ficha_{oid}",
+                    )
+                producto_ficha_actual = opciones_materiales_ficha.get(producto_ficha_seleccionado)
+                stock_ficha_actual = int(producto_ficha_actual[4] or 0) if producto_ficha_actual else 1
+                with agregar_col2:
+                    cantidad_ficha_adicional = st.number_input(
+                        "Cantidad",
+                        min_value=1,
+                        max_value=max(stock_ficha_actual, 1),
+                        value=1,
+                        step=1,
+                        key=f"cantidad_adicional_ficha_{oid}",
+                    )
+                with agregar_col3:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("➕ Agregar material", key=f"agregar_material_ficha_{oid}", use_container_width=True):
+                        if producto_ficha_actual:
+                            producto_id_f, codigo_f, nombre_f, precio_f, stock_f = producto_ficha_actual
+                            if int(cantidad_ficha_adicional) > int(stock_f or 0):
+                                st.error(f"Stock insuficiente. Disponible: {int(stock_f or 0)}.")
+                            else:
+                                conn_add_mat = obtener_conexion()
+                                cur_add_mat = conn_add_mat.cursor()
+                                cur_add_mat.execute(
+                                    "SELECT venta_ref FROM ventas WHERE orden_id = ? AND tipo_venta = 'MATERIAL REPARACION' LIMIT 1",
+                                    (oid,),
+                                )
+                                fila_ref = cur_add_mat.fetchone()
+                                referencia_material_ficha = fila_ref[0] if fila_ref and fila_ref[0] else f"ORDEN-{oid:04d}"
+                                fecha_material_ficha = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                                cur_add_mat.execute(
+                                    "UPDATE productos SET stock = stock - ? WHERE id = ? AND stock >= ?",
+                                    (int(cantidad_ficha_adicional), producto_id_f, int(cantidad_ficha_adicional)),
+                                )
+                                cur_add_mat.execute(
+                                    "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono, venta_ref, recibido, vuelto, orden_id, tipo_venta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                    (
+                                        codigo_f,
+                                        nombre_f,
+                                        int(cantidad_ficha_adicional),
+                                        int(cantidad_ficha_adicional) * float(precio_f or 0),
+                                        ord_data[6] or "",
+                                        "",
+                                        0,
+                                        f"Material adicional utilizado en Orden #{oid:04d}",
+                                        fecha_material_ficha,
+                                        ord_data[1] or "CONSUMIDOR FINAL",
+                                        ord_data[2] or "N/A",
+                                        ord_data[3] or "N/A",
+                                        referencia_material_ficha,
+                                        0.0,
+                                        0.0,
+                                        oid,
+                                        "MATERIAL REPARACION",
+                                    ),
+                                )
+                                conn_add_mat.commit()
+                                conn_add_mat.close()
+                                st.success(f"{nombre_f} agregado a la orden y descontado del inventario.")
+                                st.rerun()
+                        else:
+                            st.warning("Selecciona un producto del inventario.")
 
                 st.markdown("##### 📝 Actualizar datos del servicio")
                 edit_col1, edit_col2 = st.columns(2)
