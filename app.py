@@ -910,7 +910,7 @@ with tabs[0]:
                                 height: auto !important;
                             }}
                             .print-wrapper {{
-                                width: 76mm;
+                                width: 70mm;
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
@@ -919,11 +919,15 @@ with tabs[0]:
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 14px; 
-                                line-height: 1.35; 
+                                font-size: 12px; 
+                                line-height: 1.3; 
                                 font-weight: bold; 
-                                white-space: pre; 
+                                white-space: pre-wrap; 
+                                overflow-wrap: anywhere;
+                                word-break: break-word;
                                 display: inline-block;
+                                max-width: 70mm;
+                                overflow: hidden;
                                 letter-spacing: -0.3px;
                             }}
                         </style>
@@ -1112,8 +1116,8 @@ with tabs[1]:
                     <html><head><style>
                         @page {{ size: 80mm 300mm; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
-                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 15mm; page-break-before: avoid; page-break-after: avoid; page-break-inside: avoid; break-before: avoid; break-after: avoid; break-inside: avoid; display: inline-block; }}
-                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.35; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; box-sizing: border-box; letter-spacing: -0.3px; }}
+                        .print-wrapper {{ width: 70mm; margin: 0 auto; text-align: center; padding-bottom: 15mm; page-break-before: avoid; page-break-after: avoid; page-break-inside: avoid; break-before: avoid; break-after: avoid; break-inside: avoid; display: inline-block; }}
+                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 12px; line-height: 1.3; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: -0.3px; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                         <div class="print-wrapper">{logo_reimpresion_html}<div class="ticket-container">{escape(ticket_reimpresion)}</div></div>
@@ -2078,7 +2082,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 76mm;
+                                    width: 70mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -2087,8 +2091,8 @@ if cfg['modo_taller'] == 1:
 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 15px;
-                                    line-height: 1.4;
+                                    font-size: 12px;
+                                    line-height: 1.3;
                                     font-weight: bold;
                                     /* Conserva saltos y envuelve textos largos. */
                                     white-space: pre-wrap;
@@ -2097,6 +2101,8 @@ if cfg['modo_taller'] == 1:
                                     display: block;
                                     width: 100%;
                                     max-width: 100%;
+                                    max-width: 70mm;
+                                    overflow: hidden;
                                     box-sizing: border-box;
                                     letter-spacing: 0;
                                 }}
@@ -2762,7 +2768,7 @@ if cfg['modo_taller'] == 1:
                                     height: auto !important;
                                 }}
                                 .print-wrapper {{
-                                    width: 76mm;
+                                    width: 70mm;
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
@@ -2771,8 +2777,8 @@ if cfg['modo_taller'] == 1:
                                 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 15px;
-                                    line-height: 1.4;
+                                    font-size: 12px;
+                                    line-height: 1.3;
                                     font-weight: bold;
                                     color: #000000;
                                     white-space: pre-wrap;
@@ -2781,6 +2787,8 @@ if cfg['modo_taller'] == 1:
                                     display: block;
                                     width: 100%;
                                     max-width: 100%;
+                                    max-width: 70mm;
+                                    overflow: hidden;
                                     box-sizing: border-box;
                                     letter-spacing: 0;
                                 }}
