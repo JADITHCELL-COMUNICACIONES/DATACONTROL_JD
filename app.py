@@ -1994,10 +1994,10 @@ if cfg['modo_taller'] == 1:
 	NOTAS:   {rt['chequeo']}
 	{bloque_materiales_ticket}
 	------------------------------------------
- COSTO TOTAL:       ${rt_costo:,.2f}
- TOTAL ABONADO:     ${rt_abono:,.2f}
- SALDO PENDIENTE:   ${saldo_r:,.2f}
- ESTADO ACTUAL:     {rt['estado']}
+ COSTO TOTAL: ${rt_costo:,.2f}
+ TOTAL ABONADO: ${rt_abono:,.2f}
+ SALDO PENDIENTE: ${saldo_r:,.2f}
+ ESTADO ACTUAL: {rt['estado']}
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
@@ -2026,10 +2026,10 @@ if cfg['modo_taller'] == 1:
  FALLA: {rt['falla']}
  NOTAS: {rt['chequeo']}
 ------------------------------------------
- COSTO TOTAL:       ${rt_costo:,.2f}
- TOTAL ABONADO:     ${rt_abono:,.2f}
- SALDO PENDIENTE:   ${saldo_r:,.2f}
- ESTADO ACTUAL:     {rt['estado']}
+ COSTO TOTAL: ${rt_costo:,.2f}
+ TOTAL ABONADO: ${rt_abono:,.2f}
+ SALDO PENDIENTE: ${saldo_r:,.2f}
+ ESTADO ACTUAL: {rt['estado']}
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
@@ -2736,10 +2736,10 @@ if cfg['modo_taller'] == 1:
  FALLA: {ord_data[7]}
  NOTAS: {ord_data[12]}
 ------------------------------------------
- COSTO TOTAL:       ${c_tot:,.2f}
- TOTAL ABONADO:     ${c_abo:,.2f}
- SALDO PENDIENTE:   ${saldo_copia:,.2f}
- ESTADO ACTUAL:     {nuevo_estado_edit}
+ COSTO TOTAL: ${c_tot:,.2f}
+ TOTAL ABONADO: ${c_abo:,.2f}
+ SALDO PENDIENTE: ${saldo_copia:,.2f}
+ ESTADO ACTUAL: {nuevo_estado_edit}
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
