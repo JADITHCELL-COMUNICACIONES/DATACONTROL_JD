@@ -899,7 +899,7 @@ with tabs[0]:
                         <head>
                         <style>
                             @page {{
-                                size: 80mm auto;
+                                size: 80mm 220mm;
                                 margin: 0;
                             }}
                             html, body {{
@@ -914,7 +914,7 @@ with tabs[0]:
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
-                                padding-bottom: 15mm;
+                                padding-bottom: 15mm; page-break-inside: avoid; break-inside: avoid;
                             }}
                             .ticket-container {{ 
                                 text-align: left; 
@@ -1110,9 +1110,9 @@ with tabs[1]:
                 )
                 components.html(f"""
                     <html><head><style>
-                        @page {{ size: 80mm auto; margin: 0; }}
+                        @page {{ size: 80mm 220mm; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
-                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 15mm; }}
+                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 15mm; page-break-inside: avoid; break-inside: avoid; }}
                         .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.35; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; box-sizing: border-box; letter-spacing: -0.3px; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
@@ -2067,7 +2067,7 @@ if cfg['modo_taller'] == 1:
                             <head>
                             <style>
                                 @page {{
-                                    size: 80mm auto;
+                                    size: 80mm 220mm;
                                     margin: 0;
                                 }}
                                 html, body {{
@@ -2082,7 +2082,7 @@ if cfg['modo_taller'] == 1:
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 15mm;
+                                    padding-bottom: 15mm; page-break-inside: avoid; break-inside: avoid;
                                 }}
 .ticket-container {{
                                     text-align: left;
@@ -2751,7 +2751,7 @@ if cfg['modo_taller'] == 1:
                             <head>
                             <style>
                                 @page {{
-                                    size: 80mm auto;
+                                    size: 80mm 220mm;
                                     margin: 0;
                                 }}
                                 html, body {{
@@ -2766,7 +2766,7 @@ if cfg['modo_taller'] == 1:
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 15mm;
+                                    padding-bottom: 15mm; page-break-inside: avoid; break-inside: avoid;
                                 }}
                                 .ticket-container {{
                                     text-align: left;
@@ -2927,5 +2927,3 @@ with tabs[-1]:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- BARRA INFERIOR/ESTADO ---
-st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
