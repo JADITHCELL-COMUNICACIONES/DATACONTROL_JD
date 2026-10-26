@@ -919,8 +919,8 @@ with tabs[0]:
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 4mm; 
-                                line-height: 1.25; 
+                                font-size: 4.5mm; 
+                                line-height: 1.2; 
                                 font-weight: bold; 
                                 white-space: pre-wrap; 
                                 overflow-wrap: anywhere;
@@ -1117,7 +1117,7 @@ with tabs[1]:
                         @page {{ size: 80mm 300mm; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
                         .print-wrapper {{ width: 70mm; margin: 0 auto; text-align: center; padding-bottom: 0; page-break-before: avoid; page-break-after: avoid; page-break-inside: avoid; break-before: avoid; break-after: avoid; break-inside: avoid; display: block; }}
-                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 4mm; line-height: 1.25; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
+                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 4.5mm; line-height: 1.2; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                         <div class="print-wrapper">{logo_reimpresion_html}<div class="ticket-container">{escape(ticket_reimpresion)}</div></div>
@@ -2064,7 +2064,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4mm !important; line-height: 1.2 !important; font-weight: 900 !important; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4.3mm !important; line-height: 1.2 !important; font-weight: 900 !important; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2091,8 +2091,8 @@ if cfg['modo_taller'] == 1:
 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 4mm;
-                                    line-height: 1.25;
+                                    font-size: 4.5mm;
+                                    line-height: 1.2;
                                     font-weight: bold;
                                     /* Conserva saltos y envuelve textos largos. */
                                     white-space: pre-wrap;
@@ -2752,7 +2752,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4mm !important; line-height: 1.2 !important; font-weight: 900 !important; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4.3mm !important; line-height: 1.2 !important; font-weight: 900 !important; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2779,8 +2779,8 @@ if cfg['modo_taller'] == 1:
                                 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 4mm;
-                                    line-height: 1.25;
+                                    font-size: 4.5mm;
+                                    line-height: 1.2;
                                     font-weight: bold;
                                     color: #000000;
                                     white-space: pre-wrap;
