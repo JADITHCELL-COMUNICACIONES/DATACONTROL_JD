@@ -1199,11 +1199,13 @@ with tabs[2]:
 
         st.markdown("---")
         clave_confirmar_eliminacion = f"confirmar_eliminar_producto_{producto_id}"
-        if not st.session_state.get(clave_confirmar_eliminacion, False):
+        mostrar_confirmacion_eliminacion = st.session_state.get(clave_confirmar_eliminacion, False)
+        if not mostrar_confirmacion_eliminacion:
             if st.button("🗑️ Eliminar este producto", use_container_width=True, key=f"ficha_eliminar_{producto_id}"):
                 st.session_state[clave_confirmar_eliminacion] = True
-                st.rerun()
-        else:
+                mostrar_confirmacion_eliminacion = True
+
+        if mostrar_confirmacion_eliminacion:
             st.warning(f"¿Confirmas eliminar definitivamente **{ficha[2]}** del inventario?")
             confirmar_col, cancelar_col = st.columns(2)
             with confirmar_col:
