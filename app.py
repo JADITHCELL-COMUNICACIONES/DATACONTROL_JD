@@ -858,16 +858,16 @@ with tabs[0]:
                 f" CLIENTE: {rg['cliente']}",
                 f" CÉDULA:  {rg['cedula']} | TEL: {rg['telefono']}",
                 f"------------------------------------------",
-                f"CANT PRODUCTO         TOTAL",
+                f"CANT PRODUCTO                    VALOR",
                 f"------------------------------------------"
             ]
             for itm in rg['items']:
-                lineas_ticket.append(f"{itm['cantidad']:<2} {itm['nombre'][:15]:<16} ${itm['total']:>15,.2f}")
+                lineas_ticket.append(f"{int(itm['cantidad']):>2} {str(itm['nombre'])[:18]:<18} ${float(itm['total']):,.0f}")
             lineas_ticket.extend([
                 f"------------------------------------------",
-                f" TOTAL:            ${rg['subtotal']:>18,.2f}",
-                f" RECIBIDO:         ${rg['recibido']:>18,.2f}",
-                f" CAMBIO:           ${rg['vuelto']:>18,.2f}",
+                f" TOTAL: ${rg['subtotal']:,.0f}",
+                f" RECIBIDO: ${rg['recibido']:,.0f}",
+                f" CAMBIO: ${rg['vuelto']:,.0f}",
                 f"==========================================",
                 f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
                 f" NOTAS DEL PEDIDO:\n {rg['notas']}" if rg.get('notas') else "",
@@ -919,8 +919,8 @@ with tabs[0]:
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 4.8mm; 
-                                line-height: 1.1; 
+                                font-size: 3.6mm;
+                                line-height: 1.2; 
                                 font-weight: bold; 
                                 white-space: pre-wrap; 
                                 overflow-wrap: anywhere;
@@ -1079,18 +1079,18 @@ with tabs[1]:
                     f" CLIENTE: {primera_fila['Cliente'] or 'CONSUMIDOR FINAL'}",
                     f" CÉDULA:  {primera_fila['Cédula'] or 'N/A'} | TEL: {primera_fila['Teléfono'] or 'N/A'}",
                     "------------------------------------------",
-                    "CANT PRODUCTO         TOTAL",
+                    "CANT PRODUCTO                    VALOR",
                     "------------------------------------------",
                 ]
                 for _, item_venta in venta_rows.iterrows():
                     lineas_reimpresion.append(
-                        f"{int(item_venta['Cantidad']):<2} {str(item_venta['Producto'])[:15]:<16} ${float(item_venta['Total']):>15,.2f}"
+                        f"{int(item_venta['Cantidad']):>2} {str(item_venta['Producto'])[:18]:<18} ${float(item_venta['Total']):,.0f}"
                     )
                 lineas_reimpresion.extend([
                     "------------------------------------------",
-                    f" TOTAL:            ${total_reimpresion:>18,.2f}",
-                    f" RECIBIDO:         ${recibido_reimpresion:>18,.2f}",
-                    f" CAMBIO:           ${cambio_reimpresion:>18,.2f}",
+                    f" TOTAL: ${total_reimpresion:,.0f}",
+                    f" RECIBIDO: ${recibido_reimpresion:,.0f}",
+                    f" CAMBIO: ${cambio_reimpresion:,.0f}",
                     "==========================================",
                     f" IMEI 1: {primera_fila['IMEI']}" if primera_fila['IMEI'] else "",
                     f" NOTAS DEL PEDIDO:\n {primera_fila['Notas']}" if primera_fila['Notas'] else "",
@@ -1117,7 +1117,7 @@ with tabs[1]:
                         @page {{ size: 80mm 300mm; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
                         .print-wrapper {{ width: 78mm; margin: 0 auto; text-align: center; padding-bottom: 0; page-break-before: avoid; page-break-after: avoid; page-break-inside: avoid; break-before: avoid; break-after: avoid; break-inside: avoid; display: block; }}
-                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 4.8mm; line-height: 1.1; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 78mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
+                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 3.6mm; line-height: 1.2; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 78mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                         <div class="print-wrapper">{logo_reimpresion_html}<div class="ticket-container">{escape(ticket_reimpresion)}</div></div>
