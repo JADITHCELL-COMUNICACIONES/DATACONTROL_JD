@@ -1480,8 +1480,31 @@ with tabs[2]:
             except: pass
             return [''] * len(row)
 
-        df_styled = df_inventario_tabla.style.apply(resaltar_stock_bajo, axis=1)
-        st.dataframe(df_styled, use_container_width=True, hide_index=True, height=600)
+        if df_inventario_tabla.empty:
+            st.info("No hay productos para mostrar.")
+        else:
+            st.markdown(
+                "<div style='display:grid;grid-template-columns:1.1fr 2.2fr 1.1fr 1.1fr .7fr 1.4fr 1.2fr 1fr;gap:6px;padding:8px;background:#1f2937;color:#facc15;font-weight:700;font-size:12px;'>"
+                "<span>Código</span><span>Nombre</span><span>Compra</span><span>Venta</span><span>Stock</span><span>Proveedor</span><span>Categoría</span><span>Ficha</span></div>",
+                unsafe_allow_html=True,
+            )
+            with st.container(height=600):
+                for _, fila_inv in df_inventario_tabla.iterrows():
+                    inv_id_fila = int(fila_inv["ID"])
+                    stock_fila = int(fila_inv["Stock"] or 0)
+                    color_stock = "#7f1d1d" if stock_fila <= 1 else "#111827"
+                    row_inv = st.columns([1.1, 2.2, 1.1, 1.1, .7, 1.4, 1.2, 1])
+                    with row_inv[0]: st.caption(str(fila_inv["Código"] or ""))
+                    with row_inv[1]: st.markdown(f"<span style='font-size:12px;color:#f8fafc'>{fila_inv['Nombre']}</span>", unsafe_allow_html=True)
+                    with row_inv[2]: st.caption(f"${float(str(fila_inv['Precio Compra'] or 0).replace(',', '')):,.0f}")
+                    with row_inv[3]: st.caption(f"${float(str(fila_inv['Precio Venta'] or 0).replace(',', '')):,.0f}")
+                    with row_inv[4]: st.markdown(f"<span style='background:{color_stock};padding:2px 5px;border-radius:4px;color:white;font-weight:700'>{stock_fila}</span>", unsafe_allow_html=True)
+                    with row_inv[5]: st.caption(str(fila_inv["Proveedor"] or ""))
+                    with row_inv[6]: st.caption(str(fila_inv["Categoría"] or ""))
+                    with row_inv[7]:
+                        if st.button("📄 Ver ficha", key=f"inv_ficha_tabla_{inv_id_fila}", help="Ver ficha completa del producto"):
+                            mostrar_ficha_producto(inv_id_fila)
+                    st.markdown("<hr style='margin:2px 0 4px;border-color:#334155'>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
