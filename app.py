@@ -1153,39 +1153,54 @@ with tabs[2]:
     productos_encontrados = cur_inv_sel.fetchall()
     conn_inv_sel.close()
 
-    if productos_encontrados:
-        st.markdown("##### 📋 Productos encontrados — selecciona una ficha para editar")
-        for producto_fila in productos_encontrados:
-            producto_id_fila, codigo_fila, nombre_fila, compra_fila, venta_fila, stock_fila, proveedor_fila, categoria_fila = producto_fila
-            fila_inv_1, fila_inv_2, fila_inv_3, fila_inv_4 = st.columns([4, 1, 1, 1])
-            with fila_inv_1:
-                st.markdown(f"**{nombre_fila}**  \nCódigo: `{codigo_fila or 'N/A'}`")
-            with fila_inv_2:
-                st.metric("Stock", int(stock_fila or 0))
-            with fila_inv_3:
-                st.caption(f"Venta\n${float(venta_fila or 0):,.0f}")
-            with fila_inv_4:
-                if st.button("📄 Ver ficha", key=f"inv_ver_ficha_{producto_id_fila}", use_container_width=True):
-                    st.session_state.inv_producto_id = producto_id_fila
-                    st.session_state.inv_cod = str(codigo_fila or "")
-                    st.session_state.inv_nom = str(nombre_fila or "")
-                    st.session_state.inv_com = str(compra_fila or 0)
-                    st.session_state.inv_ven = str(venta_fila or 0)
-                    st.session_state.inv_stk = str(stock_fila or 0)
-                    st.session_state.inv_prov = str(proveedor_fila or "")
-                    st.session_state.inv_cat = str(categoria_fila or "")
-                    st.session_state.inv_ficha_abierta = True
-                    st.rerun()
-            st.divider()
+    @st.dialog("📦 Ficha del producto", width="large")
+    def mostrar_ficha_producto(producto_id):
+        conn_ficha = obtener_conexion()
+        cur_ficha = conn_ficha.cursor()
+        cur_ficha.execute(
+            "SELECT id, codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria FROM productos WHERE id = ?",
+            (producto_id,),
+        )
+        ficha = cur_ficha.fetchone()
+        conn_ficha.close()
+
+        if not ficha:
+            st.error("El producto ya no existe en el inventario.")
+            return
+
+        st.markdown(f"### 📦 {ficha[2]}")
+        st.caption(f"ID del producto: {ficha[0]} · Los cambios se aplican sobre este mismo registro.")
+        ficha_col1, ficha_col2 = st.columns(2)
+        with ficha_col1:
+            ficha_codigo = st.text_input("Código", value=str(ficha[1] or ""), key=f"ficha_codigo_{producto_id}")
+            ficha_nombre = st.text_input("Nombre", value=str(ficha[2] or ""), key=f"ficha_nombre_{producto_id}")
+            ficha_compra = st.number_input("Precio de compra", min_value=0.0, value=float(ficha[3] or 0), step=100.0, key=f"ficha_compra_{producto_id}")
+            ficha_venta = st.number_input("Precio de venta", min_value=0.0, value=float(ficha[4] or 0), step=100.0, key=f"ficha_venta_{producto_id}")
+        with ficha_col2:
+            ficha_stock = st.number_input("Stock", min_value=0, value=int(ficha[5] or 0), step=1, key=f"ficha_stock_{producto_id}")
+            ficha_proveedor = st.text_input("Proveedor", value=str(ficha[6] or ""), key=f"ficha_proveedor_{producto_id}")
+            ficha_categoria = st.text_input("Categoría", value=str(ficha[7] or ""), key=f"ficha_categoria_{producto_id}")
+
+        guardar_ficha = st.button("💾 Guardar cambios del producto", type="primary", use_container_width=True, key=f"ficha_guardar_{producto_id}")
+        if guardar_ficha:
+            if not ficha_nombre.strip():
+                st.error("El nombre del producto es obligatorio.")
+            else:
+                conn_guardar_ficha = obtener_conexion()
+                cur_guardar_ficha = conn_guardar_ficha.cursor()
+                cur_guardar_ficha.execute(
+                    "UPDATE productos SET codigo=?, nombre=?, precio_compra=?, precio_venta=?, stock=?, proveedor=?, categoria=? WHERE id=?",
+                    (ficha_codigo.strip(), ficha_nombre.strip(), float(ficha_compra), float(ficha_venta), int(ficha_stock), ficha_proveedor.strip().upper(), ficha_categoria.strip().upper(), producto_id),
+                )
+                conn_guardar_ficha.commit()
+                conn_guardar_ficha.close()
+                st.success("Producto actualizado correctamente, sin crear duplicados.")
+                st.rerun()
 
     col_inv_izq, col_inv_der = st.columns([1, 2])
 
     with col_inv_izq:
-        if st.session_state.get("inv_producto_id") and st.session_state.get("inv_ficha_abierta", False):
-            st.markdown("##### 📄 FICHA DEL PRODUCTO")
-            st.info(f"Editando el producto seleccionado (ID interno: {st.session_state.inv_producto_id}). Los cambios se guardarán sobre este mismo registro.")
-        else:
-            st.markdown("##### GESTIÓN DE INVENTARIO")
+        st.markdown("##### GESTIÓN DE INVENTARIO")
         if productos_encontrados:
             opciones_edicion = [
                 f"{p[2]} — Código: {p[1] or 'N/A'} — Stock actual: {p[5] or 0}"
@@ -1196,21 +1211,13 @@ with tabs[2]:
                 options=["-- Seleccione el producto a editar --"] + opciones_edicion,
                 key="inv_producto_edicion"
             )
-            if st.button("📥 Cargar producto para editar", use_container_width=True, key="inv_btn_cargar"):
+            if st.button("📄 Ver ficha del producto", use_container_width=True, key="inv_btn_cargar"):
                 if producto_edicion != "-- Seleccione el producto a editar --":
                     producto_idx = opciones_edicion.index(producto_edicion)
                     producto = productos_encontrados[producto_idx]
-                    st.session_state.inv_cod = str(producto[1] or "")
-                    st.session_state.inv_nom = str(producto[2] or "")
-                    st.session_state.inv_com = str(producto[3] or 0)
-                    st.session_state.inv_ven = str(producto[4] or 0)
-                    st.session_state.inv_stk = str(producto[5] or 0)
-                    st.session_state.inv_prov = str(producto[6] or "")
-                    st.session_state.inv_cat = str(producto[7] or "")
-                    st.session_state.inv_producto_id = producto[0]
-                    st.rerun()
+                    mostrar_ficha_producto(producto[0])
                 else:
-                    st.warning("Seleccione un producto de la búsqueda.")
+                    st.warning("Seleccione un producto para abrir su ficha.")
 
             if st.button("🗑️ Eliminar producto seleccionado", use_container_width=True, key="inv_btn_eliminar"):
                 if producto_edicion != "-- Seleccione el producto a editar --":
@@ -1261,7 +1268,7 @@ with tabs[2]:
         with b_col_3:
             btn_limpiar_inv = st.button("Limpiar", use_container_width=True, key="inv_btn_limp")
         with b_col_4:
-            btn_cerrar_ficha_inv = st.button("Cerrar ficha", use_container_width=True, key="inv_btn_cerrar_ficha")
+            pass
 
         st.markdown("---")
         st.markdown('<div class="lbl-celeste">📂 Importar Archivo Excel (.xlsx):</div>', unsafe_allow_html=True)
@@ -1372,7 +1379,7 @@ with tabs[2]:
             else:
                 st.info("Este archivo ya fue importado. Selecciona otro archivo para cargarlo nuevamente.")
 
-        if btn_limpiar_inv or btn_cerrar_ficha_inv:
+        if btn_limpiar_inv:
             for clave_inventario in (
                 "inv_producto_id", "inv_ficha_abierta", "inv_cod", "inv_nom",
                 "inv_com", "inv_ven", "inv_stk", "inv_prov", "inv_cat",
