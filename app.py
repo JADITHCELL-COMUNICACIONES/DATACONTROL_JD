@@ -914,7 +914,7 @@ with tabs[0]:
                                 margin: 0 auto;
                                 text-align: center;
                                 height: auto !important;
-                                padding-bottom: 3mm;
+                                padding-bottom: 15mm;
                             }}
                             .ticket-container {{ 
                                 text-align: left; 
@@ -1112,7 +1112,7 @@ with tabs[1]:
                     <html><head><style>
                         @page {{ size: 80mm auto; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
-                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 3mm; }}
+                        .print-wrapper {{ width: 76mm; margin: 0 auto; text-align: center; padding-bottom: 15mm; }}
                         .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.35; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; box-sizing: border-box; letter-spacing: -0.3px; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
@@ -2001,6 +2001,7 @@ if cfg['modo_taller'] == 1:
 ==========================================
                 """
 
+                fecha_ingreso_taller = str(rt.get("fecha") or fecha_taller_actual).replace("T", " ")[:16]
                 ticket_cliente_impresion = f"""
 ==========================================
         {cfg['empresa']}
@@ -2010,14 +2011,16 @@ if cfg['modo_taller'] == 1:
         Cel: {cfg['telefono']}
 ==========================================
  ORDEN DE SERVICIO N°: {rt_id:04d}
- FECHA: {fecha_taller_actual}
+ FECHA INGRESO: {fecha_ingreso_taller}
+ FECHA COPIA:   {fecha_taller_actual[:16]}
 ------------------------------------------
  CLIENTE: {rt['cliente']}
- CÉDULA:  {rt['cedula']} | TEL: {rt['telefono']}
- EQUIPO:  {rt['equipo']}
- IMEI:    {rt['imei']}
- FALLA:   {rt['falla']}
- NOTAS:   {rt['chequeo']}
+ CÉDULA: {rt['cedula']}
+ TELÉFONO: {rt['telefono']}
+ EQUIPO: {rt['equipo']}
+ IMEI: {rt['imei']}
+ FALLA: {rt['falla']}
+ NOTAS: {rt['chequeo']}
 ------------------------------------------
  COSTO TOTAL:       ${rt_costo:,.2f}
  TOTAL ABONADO:     ${rt_abono:,.2f}
@@ -2057,7 +2060,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px; margin-bottom: 8mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2079,13 +2082,13 @@ if cfg['modo_taller'] == 1:
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 3mm;
+                                    padding-bottom: 15mm;
                                 }}
 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 14px;
-                                    line-height: 1.35;
+                                    font-size: 15px;
+                                    line-height: 1.4;
                                     font-weight: bold;
                                     /* Conserva saltos y envuelve textos largos. */
                                     white-space: pre-wrap;
@@ -2095,7 +2098,7 @@ if cfg['modo_taller'] == 1:
                                     width: 100%;
                                     max-width: 100%;
                                     box-sizing: border-box;
-                                    letter-spacing: -0.3px;
+                                    letter-spacing: 0;
                                 }}
                             </style>
                             </head>
@@ -2703,6 +2706,8 @@ if cfg['modo_taller'] == 1:
                             f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_copia_base64}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>'
                             if logo_copia_base64 else ""
                         )
+                        fecha_ingreso_copia = str(ord_data[13] or "").replace("T", " ")[:16]
+                        fecha_impresion_copia = str(fecha_copia)[:16]
                         ticket_copia_cliente = f"""
 ==========================================
         {cfg['empresa']}
@@ -2712,15 +2717,16 @@ if cfg['modo_taller'] == 1:
         Cel: {cfg['telefono']}
 ==========================================
  ORDEN DE SERVICIO N°: {oid:04d}
- FECHA DE INGRESO: {ord_data[13]}
- FECHA DE IMPRESIÓN: {fecha_copia}
+ FECHA INGRESO: {fecha_ingreso_copia}
+ FECHA COPIA:   {fecha_impresion_copia}
 ------------------------------------------
  CLIENTE: {ord_data[1]}
- CÉDULA:  {ord_data[2]} | TEL: {ord_data[3]}
- EQUIPO:  {ord_data[5]}
- IMEI:    {ord_data[6]}
- FALLA:   {ord_data[7]}
- NOTAS:   {ord_data[12]}
+ CÉDULA: {ord_data[2]}
+ TELÉFONO: {ord_data[3]}
+ EQUIPO: {ord_data[5]}
+ IMEI: {ord_data[6]}
+ FALLA: {ord_data[7]}
+ NOTAS: {ord_data[12]}
 ------------------------------------------
  COSTO TOTAL:       ${c_tot:,.2f}
  TOTAL ABONADO:     ${c_abo:,.2f}
@@ -2738,7 +2744,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="text-align: center; font-weight: bold; margin-top: 5px; margin-bottom: 8mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2760,13 +2766,13 @@ if cfg['modo_taller'] == 1:
                                     margin: 0 auto;
                                     text-align: center;
                                     height: auto !important;
-                                    padding-bottom: 3mm;
+                                    padding-bottom: 15mm;
                                 }}
                                 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 14px;
-                                    line-height: 1.35;
+                                    font-size: 15px;
+                                    line-height: 1.4;
                                     font-weight: bold;
                                     color: #000000;
                                     white-space: pre-wrap;
@@ -2776,7 +2782,7 @@ if cfg['modo_taller'] == 1:
                                     width: 100%;
                                     max-width: 100%;
                                     box-sizing: border-box;
-                                    letter-spacing: -0.3px;
+                                    letter-spacing: 0;
                                 }}
                             </style>
                             </head>
