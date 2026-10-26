@@ -535,7 +535,7 @@ def obtener_datos_config():
             }
     except: pass
     return {
-     "empresa": "JADITHCELL COMUNICACIONES",
+        "empresa": "JADITHCELL COMUNICACIONES",
         "propietario": "GADIEL NOVOA GUTIERREZ",
         "nit": "N/A",
         "direccion": "Los Andes, Magdalena",
@@ -846,7 +846,7 @@ with tabs[0]:
             
             lineas_ticket = [
                 f"==========================================",
-                f"        {cfg['empresa']}",
+                f"   {cfg['empresa']}",
                 f"       {cfg['propietario']}",
                 f"       NIT / CC: {cfg['nit']}",
                 f"        {cfg['direccion']}",
@@ -1067,7 +1067,7 @@ with tabs[1]:
                 cambio_reimpresion = float(primera_fila["Cambio"] or 0.0)
                 lineas_reimpresion = [
                     "==========================================",
-                    f"        {cfg['empresa']}",
+                    f"   {cfg['empresa']}",
                     f"       {cfg['propietario']}",
                     f"       NIT / CC: {cfg['nit']}",
                     f"        {cfg['direccion']}",
@@ -1976,7 +1976,7 @@ if cfg['modo_taller'] == 1:
 
                 ticket_taller_str = f"""
 ==========================================
-        {cfg['empresa']}
+   {cfg['empresa']}
        {cfg['propietario']}
        NIT / CC: {cfg['nit']}
         {cfg['direccion']}
@@ -2008,7 +2008,7 @@ if cfg['modo_taller'] == 1:
                 fecha_ingreso_taller = str(rt.get("fecha") or fecha_taller_actual).replace("T", " ")[:16]
                 ticket_cliente_impresion = f"""
 ==========================================
-        {cfg['empresa']}
+   {cfg['empresa']}
        {cfg['propietario']}
        NIT / CC: {cfg['nit']}
         {cfg['direccion']}
@@ -2716,7 +2716,7 @@ if cfg['modo_taller'] == 1:
                         fecha_impresion_copia = str(fecha_copia)[:16]
                         ticket_copia_cliente = f"""
 ==========================================
-        {cfg['empresa']}
+   {cfg['empresa']}
        {cfg['propietario']}
        NIT / CC: {cfg['nit']}
         {cfg['direccion']}
@@ -2935,4 +2935,5 @@ with tabs[-1]:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
+# --- BARRA INFERIOR/ESTADO ---
+st.markdown(f'<div class="status-bar">🟩 LICENCIA PROFESIONAL ACTIVA (Quedan 336 días)</div>', unsafe_allow_html=True)
