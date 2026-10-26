@@ -899,7 +899,7 @@ with tabs[0]:
                         <head>
                         <style>
                             @page {{
-                                size: 80mm auto;
+                                size: 80mm 200mm;
                                 margin: 0;
                             }}
                             html, body {{
@@ -1114,7 +1114,7 @@ with tabs[1]:
                 )
                 components.html(f"""
                     <html><head><style>
-                        @page {{ size: 80mm auto; margin: 0; }}
+                        @page {{ size: 80mm 200mm; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
                         .print-wrapper {{ width: 70mm; margin: 0 auto; text-align: center; padding-bottom: 2mm; page-break-before: avoid; page-break-after: avoid; page-break-inside: avoid; break-before: avoid; break-after: avoid; break-inside: avoid; display: block; }}
                         .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 4mm; line-height: 1.25; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
@@ -2071,7 +2071,7 @@ if cfg['modo_taller'] == 1:
                             <head>
                             <style>
                                 @page {{
-                                    size: 80mm auto;
+                                    size: 80mm 200mm;
                                     margin: 0;
                                 }}
                                 html, body {{
@@ -2099,6 +2099,8 @@ if cfg['modo_taller'] == 1:
                                     overflow-wrap: anywhere;
                                     word-break: break-word;
                                     display: block;
+                                    page-break-inside: avoid;
+                                    break-inside: avoid;
                                     width: 100%;
                                     max-width: 100%;
                                     max-width: 70mm;
@@ -2757,7 +2759,7 @@ if cfg['modo_taller'] == 1:
                             <head>
                             <style>
                                 @page {{
-                                    size: 80mm auto;
+                                    size: 80mm 200mm;
                                     margin: 0;
                                 }}
                                 html, body {{
@@ -2785,6 +2787,8 @@ if cfg['modo_taller'] == 1:
                                     overflow-wrap: anywhere;
                                     word-break: break-word;
                                     display: block;
+                                    page-break-inside: avoid;
+                                    break-inside: avoid;
                                     width: 100%;
                                     max-width: 100%;
                                     max-width: 70mm;
