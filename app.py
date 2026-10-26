@@ -1197,6 +1197,42 @@ with tabs[2]:
                 st.success("Producto actualizado correctamente, sin crear duplicados.")
                 st.rerun()
 
+        st.markdown("---")
+        clave_confirmar_eliminacion = f"confirmar_eliminar_producto_{producto_id}"
+        if not st.session_state.get(clave_confirmar_eliminacion, False):
+            if st.button("🗑️ Eliminar este producto", use_container_width=True, key=f"ficha_eliminar_{producto_id}"):
+                st.session_state[clave_confirmar_eliminacion] = True
+                st.rerun()
+        else:
+            st.warning(f"¿Confirmas eliminar definitivamente **{ficha[2]}** del inventario?")
+            confirmar_col, cancelar_col = st.columns(2)
+            with confirmar_col:
+                confirmar_eliminacion_ficha = st.button(
+                    "✅ Sí, eliminar definitivamente",
+                    type="primary",
+                    use_container_width=True,
+                    key=f"ficha_confirmar_eliminar_{producto_id}",
+                )
+            with cancelar_col:
+                cancelar_eliminacion_ficha = st.button(
+                    "Cancelar",
+                    use_container_width=True,
+                    key=f"ficha_cancelar_eliminar_{producto_id}",
+                )
+
+            if confirmar_eliminacion_ficha:
+                conn_eliminar_ficha = obtener_conexion()
+                cur_eliminar_ficha = conn_eliminar_ficha.cursor()
+                cur_eliminar_ficha.execute("DELETE FROM productos WHERE id = ?", (producto_id,))
+                conn_eliminar_ficha.commit()
+                conn_eliminar_ficha.close()
+                st.session_state.pop(clave_confirmar_eliminacion, None)
+                st.success("Producto eliminado correctamente del inventario.")
+                st.rerun()
+            elif cancelar_eliminacion_ficha:
+                st.session_state.pop(clave_confirmar_eliminacion, None)
+                st.rerun()
+
     col_inv_izq, col_inv_der = st.columns([1, 2])
 
     with col_inv_izq:
