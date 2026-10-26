@@ -893,7 +893,7 @@ with tabs[0]:
                     fecha_impresion_real = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
                     ticket_impresion_final = ticket_limpio.replace(fecha_actual_ticket, fecha_impresion_real)
                     
-                    logo_html = f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
+                    logo_html = f'<div style="text-align: center; margin-top: 0; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
                     components.html(f"""
                         <html>
                         <head>
@@ -919,7 +919,7 @@ with tabs[0]:
                             .ticket-container {{ 
                                 text-align: left; 
                                 font-family: 'Courier New', Courier, monospace; 
-                                font-size: 3.5mm; 
+                                font-size: 4mm; 
                                 line-height: 1.25; 
                                 font-weight: bold; 
                                 white-space: pre-wrap; 
@@ -1117,7 +1117,7 @@ with tabs[1]:
                         @page {{ size: 80mm auto; margin: 0; }}
                         html, body {{ margin: 0; padding: 0; width: 80mm; background: #fff; height: auto !important; }}
                         .print-wrapper {{ width: 70mm; margin: 0 auto; text-align: center; padding-bottom: 2mm; page-break-inside: avoid; break-inside: avoid; display: block; }}
-                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 3.5mm; line-height: 1.25; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
+                        .ticket-container {{ text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 4mm; line-height: 1.25; font-weight: bold; color: #000; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; display: block; width: 100%; max-width: 70mm; overflow: hidden; box-sizing: border-box; letter-spacing: 0; }}
                     </style></head>
                     <body onload="setTimeout(function() {{ window.print(); }}, 250)">
                         <div class="print-wrapper">{logo_reimpresion_html}<div class="ticket-container">{escape(ticket_reimpresion)}</div></div>
@@ -2048,7 +2048,7 @@ if cfg['modo_taller'] == 1:
                 col_imp1, col_imp2 = st.columns(2)
                 with col_imp1:
                     if st.button("🖨️ Imprimir Recibo de Orden", type="primary", use_container_width=True, key="btn_imprimir_recibo_taller_directo"):
-                        logo_html = f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
+                        logo_html = f'<div style="text-align: center; margin-top: 0; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_base64_str}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>' if logo_base64_str else ''
                         
                         conn_f = obtener_conexion()
                         cur_f = conn_f.cursor()
@@ -2064,7 +2064,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 3.2mm; line-height: 1.2; font-weight: bold; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4mm; line-height: 1.2; font-weight: 900; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2091,7 +2091,7 @@ if cfg['modo_taller'] == 1:
 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 3.5mm;
+                                    font-size: 4mm;
                                     line-height: 1.25;
                                     font-weight: bold;
                                     /* Conserva saltos y envuelve textos largos. */
@@ -2709,7 +2709,7 @@ if cfg['modo_taller'] == 1:
                             except Exception:
                                 logo_copia_base64 = ""
                         logo_copia_html = (
-                            f'<div style="text-align: center; margin-top: 2px; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_copia_base64}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>'
+                            f'<div style="text-align: center; margin-top: 0; margin-bottom: 6px;"><img src="data:image/png;base64,{logo_copia_base64}" style="width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto;" /></div>'
                             if logo_copia_base64 else ""
                         )
                         fecha_ingreso_copia = str(ord_data[13] or "").replace("T", " ")[:16]
@@ -2750,7 +2750,7 @@ if cfg['modo_taller'] == 1:
                         else:
                             firma_html = '<div style="margin-top: 18px; text-align: center; font-size: 12px;">Firma del Cliente:<br><br><span style="display: inline-block; width: 62mm; border-bottom: 1px solid #000; height: 8mm;"></span><br>Firma manual</div>'
 
-                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 3.2mm; line-height: 1.2; font-weight: bold; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
+                        cierre_html = '<div style="width: 70mm; max-width: 70mm; box-sizing: border-box; overflow-wrap: anywhere; text-align: center; font-family: Courier New, monospace; font-size: 4mm; line-height: 1.2; font-weight: 900; margin: 5px auto 2mm;">COPIA PARA EL CLIENTE<br>¡GRACIAS POR PREFERIRNOS!</div>'
 
                         components.html(f"""
                             <html>
@@ -2777,7 +2777,7 @@ if cfg['modo_taller'] == 1:
                                 .ticket-container {{
                                     text-align: left;
                                     font-family: 'Courier New', Courier, monospace;
-                                    font-size: 3.5mm;
+                                    font-size: 4mm;
                                     line-height: 1.25;
                                     font-weight: bold;
                                     color: #000000;
