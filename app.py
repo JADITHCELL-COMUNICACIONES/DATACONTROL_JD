@@ -1138,22 +1138,54 @@ with tabs[2]:
     inv_busqueda = st.text_input("Nombre o código...", placeholder="Nombre o código...", label_visibility="collapsed", key="inv_busq_input")
 
     conn_inv_sel = obtener_conexion()
+    cur_inv_sel = conn_inv_sel.cursor()
     if inv_busqueda:
-        cur_inv_sel = conn_inv_sel.cursor()
         cur_inv_sel.execute(
             "SELECT id, codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria "
             "FROM productos WHERE nombre LIKE ? OR codigo LIKE ? ORDER BY categoria ASC, nombre ASC",
             (f"%{inv_busqueda}%", f"%{inv_busqueda}%")
         )
-        productos_encontrados = cur_inv_sel.fetchall()
     else:
-        productos_encontrados = []
+        cur_inv_sel.execute(
+            "SELECT id, codigo, nombre, precio_compra, precio_venta, stock, proveedor, categoria "
+            "FROM productos ORDER BY categoria ASC, nombre ASC"
+        )
+    productos_encontrados = cur_inv_sel.fetchall()
     conn_inv_sel.close()
+
+    if productos_encontrados:
+        st.markdown("##### 📋 Productos encontrados — selecciona una ficha para editar")
+        for producto_fila in productos_encontrados:
+            producto_id_fila, codigo_fila, nombre_fila, compra_fila, venta_fila, stock_fila, proveedor_fila, categoria_fila = producto_fila
+            fila_inv_1, fila_inv_2, fila_inv_3, fila_inv_4 = st.columns([4, 1, 1, 1])
+            with fila_inv_1:
+                st.markdown(f"**{nombre_fila}**  \nCódigo: `{codigo_fila or 'N/A'}`")
+            with fila_inv_2:
+                st.metric("Stock", int(stock_fila or 0))
+            with fila_inv_3:
+                st.caption(f"Venta\n${float(venta_fila or 0):,.0f}")
+            with fila_inv_4:
+                if st.button("📄 Ver ficha", key=f"inv_ver_ficha_{producto_id_fila}", use_container_width=True):
+                    st.session_state.inv_producto_id = producto_id_fila
+                    st.session_state.inv_cod = str(codigo_fila or "")
+                    st.session_state.inv_nom = str(nombre_fila or "")
+                    st.session_state.inv_com = str(compra_fila or 0)
+                    st.session_state.inv_ven = str(venta_fila or 0)
+                    st.session_state.inv_stk = str(stock_fila or 0)
+                    st.session_state.inv_prov = str(proveedor_fila or "")
+                    st.session_state.inv_cat = str(categoria_fila or "")
+                    st.session_state.inv_ficha_abierta = True
+                    st.rerun()
+            st.divider()
 
     col_inv_izq, col_inv_der = st.columns([1, 2])
 
     with col_inv_izq:
-        st.markdown("##### GESTIÓN DE INVENTARIO")
+        if st.session_state.get("inv_producto_id") and st.session_state.get("inv_ficha_abierta", False):
+            st.markdown("##### 📄 FICHA DEL PRODUCTO")
+            st.info(f"Editando el producto seleccionado (ID interno: {st.session_state.inv_producto_id}). Los cambios se guardarán sobre este mismo registro.")
+        else:
+            st.markdown("##### GESTIÓN DE INVENTARIO")
         if productos_encontrados:
             opciones_edicion = [
                 f"{p[2]} — Código: {p[1] or 'N/A'} — Stock actual: {p[5] or 0}"
@@ -1229,7 +1261,7 @@ with tabs[2]:
         with b_col_3:
             btn_limpiar_inv = st.button("Limpiar", use_container_width=True, key="inv_btn_limp")
         with b_col_4:
-            pass
+            btn_cerrar_ficha_inv = st.button("Cerrar ficha", use_container_width=True, key="inv_btn_cerrar_ficha")
 
         st.markdown("---")
         st.markdown('<div class="lbl-celeste">📂 Importar Archivo Excel (.xlsx):</div>', unsafe_allow_html=True)
@@ -1340,7 +1372,13 @@ with tabs[2]:
             else:
                 st.info("Este archivo ya fue importado. Selecciona otro archivo para cargarlo nuevamente.")
 
-        if btn_limpiar_inv: st.rerun()
+        if btn_limpiar_inv or btn_cerrar_ficha_inv:
+            for clave_inventario in (
+                "inv_producto_id", "inv_ficha_abierta", "inv_cod", "inv_nom",
+                "inv_com", "inv_ven", "inv_stk", "inv_prov", "inv_cat",
+            ):
+                st.session_state.pop(clave_inventario, None)
+            st.rerun()
 
         if btn_guardar_inv:
             if inv_nombre:
@@ -1374,6 +1412,7 @@ with tabs[2]:
                     conn_db.commit()
                     st.success(mensaje_guardado)
                     st.session_state.pop("inv_producto_id", None)
+                    st.session_state.pop("inv_ficha_abierta", None)
                     st.rerun()
                 except Exception as ex: st.error(f"Error: {ex}")
             else: st.error("El nombre es obligatorio.")
@@ -1394,6 +1433,7 @@ with tabs[2]:
                     conn_db.commit()
                     st.success("¡Actualizado correctamente!")
                     st.session_state.pop("inv_producto_id", None)
+                    st.session_state.pop("inv_ficha_abierta", None)
                     st.rerun()
                 except Exception as ex: st.error(f"Error: {ex}")
             else: st.error("Ingrese código o nombre.")
