@@ -847,8 +847,8 @@ with tabs[0]:
             lineas_ticket = [
                 f"==========================================",
                 f"   {cfg['empresa']}",
-                f"       {cfg['propietario']}",
-                f"       NIT / CC: {cfg['nit']}",
+                f"  {cfg['propietario']}",
+                f" NIT/CC: {cfg['nit']}",
                 f"        {cfg['direccion']}",
                 f"        Cel: {cfg['telefono']}",
                 f"==========================================",
@@ -1068,8 +1068,8 @@ with tabs[1]:
                 lineas_reimpresion = [
                     "==========================================",
                     f"   {cfg['empresa']}",
-                    f"       {cfg['propietario']}",
-                    f"       NIT / CC: {cfg['nit']}",
+                    f"  {cfg['propietario']}",
+                    f" NIT/CC: {cfg['nit']}",
                     f"        {cfg['direccion']}",
                     f"        Cel: {cfg['telefono']}",
                     "==========================================",
@@ -1977,8 +1977,8 @@ if cfg['modo_taller'] == 1:
                 ticket_taller_str = f"""
 ==========================================
    {cfg['empresa']}
-       {cfg['propietario']}
-       NIT / CC: {cfg['nit']}
+  {cfg['propietario']}
+ NIT/CC: {cfg['nit']}
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
@@ -2009,8 +2009,8 @@ if cfg['modo_taller'] == 1:
                 ticket_cliente_impresion = f"""
 ==========================================
    {cfg['empresa']}
-       {cfg['propietario']}
-       NIT / CC: {cfg['nit']}
+  {cfg['propietario']}
+ NIT/CC: {cfg['nit']}
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
@@ -2719,8 +2719,8 @@ if cfg['modo_taller'] == 1:
                         ticket_copia_cliente = f"""
 ==========================================
    {cfg['empresa']}
-       {cfg['propietario']}
-       NIT / CC: {cfg['nit']}
+  {cfg['propietario']}
+ NIT/CC: {cfg['nit']}
         {cfg['direccion']}
         Cel: {cfg['telefono']}
 ==========================================
