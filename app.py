@@ -535,7 +535,7 @@ def obtener_datos_config():
             }
     except: pass
     return {
-        "empresa": "JADITHCELL COMUNICACIONES",
+     "empresa": "JADITHCELL COMUNICACIONES",
         "propietario": "GADIEL NOVOA GUTIERREZ",
         "nit": "N/A",
         "direccion": "Los Andes, Magdalena",
