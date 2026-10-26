@@ -776,7 +776,9 @@ with tabs[0]:
                     telefono_venta = str(v_telefono or "").strip() or "N/A"
 
                     for itm in st.session_state.carrito:
-                        cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (itm['cantidad'], itm['id']))
+                        cursor.execute("UPDATE productos SET stock = stock - ? WHERE id = ? AND stock >= ?", (itm['cantidad'], itm['id'], itm['cantidad']))
+                        if getattr(cursor, "rowcount", 1) == 0:
+                            raise ValueError(f"Stock insuficiente para {itm['nombre']}. Actualiza el inventario antes de vender.")
                         cursor.execute(
                             "INSERT INTO ventas (codigo, nombre, cantidad, total, imei1, imei2, prestamo, notas, fecha, cliente, cedula, telefono, venta_ref, recibido, vuelto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
@@ -1181,7 +1183,17 @@ with tabs[2]:
             ficha_compra = st.number_input("Precio de compra", min_value=0.0, value=float(ficha[3] or 0), step=100.0, key=f"ficha_compra_{producto_id}")
             ficha_venta = st.number_input("Precio de venta", min_value=0.0, value=float(ficha[4] or 0), step=100.0, key=f"ficha_venta_{producto_id}")
         with ficha_col2:
-            ficha_stock = st.number_input("Stock", min_value=0, value=int(ficha[5] or 0), step=1, key=f"ficha_stock_{producto_id}")
+            # Streamlit no admite un valor inicial menor que min_value.
+            # Si un registro antiguo quedó con stock negativo, lo mostramos como 0
+            # para que el usuario pueda corregirlo y guardarlo desde esta ficha.
+            try:
+                stock_guardado = int(ficha[5] or 0)
+            except (TypeError, ValueError):
+                stock_guardado = 0
+            stock_inicial_seguro = max(stock_guardado, 0)
+            if stock_guardado < 0:
+                st.warning(f"Este producto tenía stock negativo ({stock_guardado}). Se mostrará como 0; guarda la ficha para corregirlo.")
+            ficha_stock = st.number_input("Stock", min_value=0, value=stock_inicial_seguro, step=1, key=f"ficha_stock_{producto_id}")
             ficha_proveedor = st.text_input("Proveedor", value=str(ficha[6] or ""), key=f"ficha_proveedor_{producto_id}")
             ficha_categoria = st.text_input("Categoría", value=str(ficha[7] or ""), key=f"ficha_categoria_{producto_id}")
 
