@@ -2226,6 +2226,25 @@ if cfg['modo_taller'] == 1:
                 else:
                     st.info(f"Se encontraron **{len(df_ordenes_tabla)} órdenes**. La lista ya está filtrada.")
 
+                # Resultado directo de la búsqueda: no depende de que el usuario
+                # vuelva a pulsar la pestaña del estado para que aparezca la orden.
+                st.markdown("#### 🔎 Resultado de la búsqueda")
+                for _, resultado in df_ordenes_tabla.iterrows():
+                    res_col1, res_col2, res_col3, res_col4, res_col5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
+                    with res_col1:
+                        st.markdown(f"**#{int(resultado['ID']):04d}**")
+                    with res_col2:
+                        st.markdown(str(resultado['Cliente'] or 'SIN CLIENTE'))
+                    with res_col3:
+                        st.markdown(str(resultado['Equipo'] or 'SIN EQUIPO'))
+                    with res_col4:
+                        st.markdown(f"🟢 `{resultado['Estado']}`")
+                    with res_col5:
+                        if st.button("🛠️ Ver Ficha", key=f"btn_busqueda_directa_{int(resultado['ID'])}"):
+                            st.session_state.ficha_orden_id = int(resultado['ID'])
+                            st.rerun()
+                    st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
+
             tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
 
             def mostrar_tabla_con_seleccion(df_sub, sufijo):
