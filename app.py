@@ -2196,22 +2196,35 @@ if cfg['modo_taller'] == 1:
             conn = obtener_conexion()
             query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
             params = []
-            numero_orden_limpio = str(filtro_numero_orden or "").strip()
+            # Acepta 34, 0034 o #0034 y los convierte al mismo ID de la orden.
+            numero_orden_limpio = str(filtro_numero_orden or "").strip().replace("#", "")
             if numero_orden_limpio:
                 if numero_orden_limpio.isdigit():
                     query_base += " AND id = ?"
-                    params.append(int(numero_orden_limpio))
+                    params.append(int(numero_orden_limpio.lstrip("0") or "0"))
                 else:
                     query_base += " AND 1 = 0"
-            if filtro_nombre_cliente.strip():
-                query_base += " AND cliente LIKE ?"
-                params.append(f"%{filtro_nombre_cliente.strip()}%")
-            if filtro_cedula_cliente.strip():
-                query_base += " AND cedula LIKE ?"
-                params.append(f"%{filtro_cedula_cliente.strip()}%")
+            nombre_busqueda = " ".join(str(filtro_nombre_cliente or "").split())
+            if nombre_busqueda:
+                query_base += " AND LOWER(COALESCE(cliente, '')) LIKE LOWER(?)"
+                params.append(f"%{nombre_busqueda}%")
+            cedula_busqueda = "".join(str(filtro_cedula_cliente or "").split())
+            if cedula_busqueda:
+                query_base += " AND REPLACE(REPLACE(COALESCE(cedula, ''), ' ', ''), '-', '') LIKE ?"
+                params.append(f"%{cedula_busqueda.replace('-', '')}%")
             query_base += " ORDER BY id DESC"
             df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
             conn.close()
+
+            filtros_activos = any((numero_orden_limpio, nombre_busqueda, cedula_busqueda))
+            if filtros_activos:
+                if df_ordenes_tabla.empty:
+                    st.warning("No se encontró ninguna orden con esos datos.")
+                elif len(df_ordenes_tabla) == 1:
+                    orden_encontrada = int(df_ordenes_tabla.iloc[0]["ID"])
+                    st.success(f"Orden encontrada automáticamente: **#{orden_encontrada:04d}** — {df_ordenes_tabla.iloc[0]['Cliente']}")
+                else:
+                    st.info(f"Se encontraron **{len(df_ordenes_tabla)} órdenes**. La lista ya está filtrada.")
 
             tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
 
