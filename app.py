@@ -349,6 +349,52 @@ def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimie
     return puntos
 
 
+def redimir_puntos_cliente(conn, claves, puntos_a_redimir, cliente, telefono):
+    """Descuenta puntos de todas las claves unificadas y deja trazabilidad."""
+    puntos_solicitados = int(puntos_a_redimir or 0)
+    if puntos_solicitados <= 0:
+        return False, "Indica una cantidad de puntos mayor que cero."
+    cursor = conn.cursor()
+    marcadores = ",".join("?" for _ in claves)
+    cursor.execute(
+        f"SELECT cedula, puntos_disponibles FROM clientes_puntos WHERE cedula IN ({marcadores}) ORDER BY cedula",
+        tuple(claves),
+    )
+    saldos = cursor.fetchall()
+    saldo_total = sum(int(fila[1] or 0) for fila in saldos)
+    if puntos_solicitados > saldo_total:
+        return False, f"El cliente solo tiene {saldo_total} puntos disponibles."
+
+    restante = puntos_solicitados
+    referencia_base = obtener_tiempo_colombia().strftime("%Y%m%d%H%M%S%f")
+    for clave, saldo in saldos:
+        descontar = min(restante, int(saldo or 0))
+        if descontar <= 0:
+            continue
+        cursor.execute(
+            "UPDATE clientes_puntos SET puntos_disponibles = puntos_disponibles - ?, actualizado = ? WHERE cedula = ?",
+            (descontar, obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S"), clave),
+        )
+        cursor.execute(
+            "INSERT INTO movimientos_puntos (cedula, cliente, puntos, tipo_movimiento, referencia, valor_pagado, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                clave,
+                str(cliente or "").strip(),
+                -descontar,
+                "REDENCION",
+                f"REDENCION-{referencia_base}-{clave}",
+                0.0,
+                f"Redención de {descontar} punto(s) por ${descontar * VALOR_POR_PUNTO:,.0f}",
+                obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        restante -= descontar
+        if restante <= 0:
+            break
+    conn.commit()
+    return True, f"Se redimieron {puntos_solicitados} puntos (${puntos_solicitados * VALOR_POR_PUNTO:,.0f})."
+
+
 def obtener_puntos_cliente(cedula, cliente=""):
     """Devuelve solo los puntos; usa nombre cuando falta la cédula."""
     cedula_limpia = clave_cliente_puntos(cedula, cliente)
@@ -1551,6 +1597,35 @@ with tabs[2]:
                 st.metric("Puntos", int(grupo["puntos"]))
             with p_col3:
                 st.metric("Valor", f"${valor_ui:,.0f}")
+            with st.expander("🎁 Redimir puntos", expanded=False):
+                max_redimir = max(int(grupo["puntos"] or 0), 0)
+                puntos_redimir = st.number_input(
+                    "¿Cuántos puntos desea redimir?",
+                    min_value=1 if max_redimir > 0 else 0,
+                    max_value=max_redimir,
+                    value=1 if max_redimir > 0 else 0,
+                    step=1,
+                    key=f"puntos_redimir_{indice_grupo}",
+                )
+                if max_redimir > 0:
+                    st.caption(f"Equivale a ${int(puntos_redimir or 0) * VALOR_POR_PUNTO:,.0f} de descuento.")
+                if st.button("✅ Confirmar redención", key=f"confirmar_redencion_{indice_grupo}", use_container_width=True):
+                    conn_redimir = obtener_conexion()
+                    try:
+                        exito_redimir, mensaje_redimir = redimir_puntos_cliente(
+                            conn_redimir,
+                            grupo["claves"],
+                            puntos_redimir,
+                            grupo["nombre"],
+                            grupo["telefono"],
+                        )
+                    finally:
+                        conn_redimir.close()
+                    if exito_redimir:
+                        st.success(mensaje_redimir)
+                        st.rerun()
+                    else:
+                        st.error(mensaje_redimir)
             if st.button("Ver movimientos", key=f"ver_movimientos_puntos_unificado_{indice_grupo}"):
                 conn_mov_ui = obtener_conexion()
                 cur_mov_ui = conn_mov_ui.cursor()
