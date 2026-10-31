@@ -406,45 +406,75 @@ def unificar_clientes_puntos(conn, claves, nueva_cedula, nuevo_nombre, nuevo_tel
         return False, "Selecciona dos registros diferentes para unificarlos."
 
     cursor = conn.cursor()
-    marcadores = ",".join("?" for _ in claves_unicas)
-    cursor.execute(
-        f"SELECT cedula, puntos_disponibles FROM clientes_puntos WHERE cedula IN ({marcadores})",
-        tuple(claves_unicas),
-    )
-    filas = cursor.fetchall()
-    puntos_totales = sum(int(fila[1] or 0) for fila in filas)
-    ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-
-    cursor.execute(
-        "SELECT id, tipo_movimiento, referencia FROM movimientos_puntos WHERE cedula IN (" + marcadores + ")",
-        tuple(claves_unicas),
-    )
-    movimientos = cursor.fetchall()
-    for movimiento_id, tipo_movimiento, referencia in movimientos:
+    try:
+        marcadores = ",".join("?" for _ in claves_unicas)
         cursor.execute(
-            "SELECT id FROM movimientos_puntos WHERE cedula = ? AND tipo_movimiento = ? AND referencia = ? AND id <> ?",
-            (clave_final, tipo_movimiento, referencia, movimiento_id),
+            f"SELECT cedula, puntos_disponibles FROM clientes_puntos WHERE cedula IN ({marcadores})",
+            tuple(claves_unicas),
         )
-        if cursor.fetchone():
-            cursor.execute("DELETE FROM movimientos_puntos WHERE id = ?", (movimiento_id,))
-        else:
-            cursor.execute(
-                "UPDATE movimientos_puntos SET cedula = ?, cliente = ? WHERE id = ?",
-                (clave_final, nombre_final, movimiento_id),
-            )
+        filas = cursor.fetchall()
+        puntos_totales = sum(int(fila[1] or 0) for fila in filas)
+        ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
 
+        cursor.execute(
+            "SELECT id, tipo_movimiento, referencia FROM movimientos_puntos WHERE cedula IN (" + marcadores + ")",
+            tuple(claves_unicas),
+        )
+        movimientos = cursor.fetchall()
+        for movimiento_id, tipo_movimiento, referencia in movimientos:
+            cursor.execute(
+                "SELECT id FROM movimientos_puntos WHERE cedula = ? AND tipo_movimiento = ? AND referencia = ? AND id <> ?",
+                (clave_final, tipo_movimiento, referencia, movimiento_id),
+            )
+            if cursor.fetchone():
+                cursor.execute("DELETE FROM movimientos_puntos WHERE id = ?", (movimiento_id,))
+            else:
+                cursor.execute(
+                    "UPDATE movimientos_puntos SET cedula = ?, cliente = ? WHERE id = ?",
+                    (clave_final, nombre_final, movimiento_id),
+                )
+
+        cursor.execute(
+            "DELETE FROM clientes_puntos WHERE cedula IN (" + marcadores + ")",
+            tuple(claves_unicas),
+        )
+        cursor.execute(
+            "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?) ",
+            (clave_final, nombre_final, str(nuevo_telefono or "").strip(), puntos_totales, ahora),
+        )
+        conn.commit()
+        return True, f"Cliente unificado correctamente con {puntos_totales} puntos."
+    except Exception as ex:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False, f"No se pudo unificar el cliente y no se aplicaron cambios: {ex}"
+
+
+def reconstruir_saldos_puntos(conn):
+    """Restaura filas resumen faltantes a partir del historial de movimientos."""
+    cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM clientes_puntos WHERE cedula IN (" + marcadores + ")",
-        tuple(claves_unicas),
+        "SELECT cedula, COALESCE(SUM(puntos), 0), MAX(cliente), MAX(fecha) "
+        "FROM movimientos_puntos GROUP BY cedula"
     )
-    cursor.execute(
-        "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?) "
-        "ON CONFLICT(cedula) DO UPDATE SET cliente=excluded.cliente, telefono=excluded.telefono, "
-        "puntos_disponibles=clientes_puntos.puntos_disponibles + excluded.puntos_disponibles, actualizado=excluded.actualizado",
-        (clave_final, nombre_final, str(nuevo_telefono or "").strip(), puntos_totales, ahora),
-    )
+    for clave, saldo, nombre, fecha in cursor.fetchall():
+        cursor.execute("SELECT 1 FROM clientes_puntos WHERE cedula = ?", (clave,))
+        if not cursor.fetchone():
+            try:
+                cursor.execute(
+                    "SELECT telefono FROM ventas WHERE cedula = ? ORDER BY id DESC LIMIT 1",
+                    (clave,),
+                )
+                telefono = (cursor.fetchone() or [""])[0]
+            except Exception:
+                telefono = ""
+            cursor.execute(
+                "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?)",
+                (clave, nombre or "Cliente sin nombre", telefono or "", int(saldo or 0), fecha or obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")),
+            )
     conn.commit()
-    return True, f"Cliente unificado correctamente con {puntos_totales} puntos."
 
 
 def obtener_puntos_cliente(cedula, cliente=""):
@@ -1583,6 +1613,7 @@ with tabs[2]:
     ).strip()
     conn_puntos_ui = obtener_conexion()
     cur_puntos_ui = conn_puntos_ui.cursor()
+    reconstruir_saldos_puntos(conn_puntos_ui)
     cur_puntos_ui.execute(
         "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos ORDER BY puntos_disponibles DESC, cliente ASC"
     )
