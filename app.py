@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import hashlib
 import zipfile
+import secrets
 from html import escape
 
 
@@ -242,6 +243,127 @@ def consultar_dataframe(conn, query, params=None):
     return pd.DataFrame(filas, columns=columnas)
 
 
+@st.fragment(run_every="10s")
+def mostrar_seguimiento_publico(token):
+    """Vista pública: solo permite consultar una orden con token + orden + últimos 4 de cédula."""
+    st.markdown("""
+    <style>
+      .tracking-shell { max-width: 720px; margin: 0 auto; }
+      .tracking-hero { background: linear-gradient(135deg,#08783c,#18a957); color:white; padding:28px; border-radius:0 0 24px 24px; }
+      .tracking-card { background:#ffffff; border:1px solid #dce9e0; border-radius:18px; padding:22px; margin:18px auto; box-shadow:0 7px 22px rgba(31,72,51,.08); color:#17212b; }
+      .tracking-pill { display:inline-block; background:#fff4d9; color:#9b6200; border-radius:99px; padding:7px 12px; font-weight:800; font-size:13px; }
+      .tracking-note { background:#f0faf4; border-left:4px solid #18a957; border-radius:10px; padding:13px; color:#285d40; }
+      .tracking-footer { text-align:center; color:#687582; font-size:12px; padding:10px 20px 30px; }
+    </style>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="tracking-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="tracking-hero"><h1 style="margin:0 0 8px">DATACONTROL JD</h1><div>Seguimiento de servicio técnico</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="tracking-card"><h2 style="margin-top:0">Consulta tu reparación</h2><p>Ingresa los datos que aparecen en el mensaje de WhatsApp.</p>', unsafe_allow_html=True)
+    with st.form("form_consulta_seguimiento"):
+        numero_consulta = st.text_input("Número de orden", placeholder="Ejemplo: 0120 o 120")
+        cedula_consulta = st.text_input("Últimos 4 dígitos de la cédula", max_chars=4, placeholder="Ejemplo: 2858")
+        consultar = st.form_submit_button("🔎 Consultar estado", type="primary", use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    resultado = st.session_state.get("seguimiento_resultado")
+    consulta_id_guardada = st.session_state.get("seguimiento_consultado_id")
+    if resultado and consulta_id_guardada:
+        # Refresca la orden desde Turso en cada ejecución del fragmento para que
+        # el cliente vea los cambios de estado sin volver a enviar el formulario.
+        conn_refresco = obtener_conexion()
+        cur_refresco = conn_refresco.cursor()
+        try:
+            cur_refresco.execute(
+                """SELECT id, cliente, cedula, equipo, estado, fecha, falla, detalles_chequeo
+                   FROM ordenes_servicio
+                   WHERE id = ? AND seguimiento_token = ?""",
+                (int(consulta_id_guardada), token),
+            )
+            fila_refrescada = cur_refresco.fetchone()
+            if fila_refrescada:
+                resultado = fila_refrescada
+                st.session_state.seguimiento_resultado = fila_refrescada
+            else:
+                resultado = None
+                st.session_state.pop("seguimiento_resultado", None)
+                st.session_state.pop("seguimiento_consultado_id", None)
+        finally:
+            conn_refresco.close()
+    if consultar:
+        numero_limpio = re.sub(r"\D", "", str(numero_consulta or ""))
+        ultimos_cedula = re.sub(r"\D", "", str(cedula_consulta or ""))[-4:]
+        if not numero_limpio or not ultimos_cedula or len(ultimos_cedula) != 4:
+            st.error("Escribe el número de orden y exactamente los últimos 4 dígitos de la cédula.")
+            resultado = None
+        else:
+            conn_publico = obtener_conexion()
+            cur_publico = conn_publico.cursor()
+            try:
+                cur_publico.execute(
+                    """SELECT id, cliente, cedula, equipo, estado, fecha, falla, detalles_chequeo
+                       FROM ordenes_servicio
+                       WHERE id = ? AND seguimiento_token = ?""",
+                    (int(numero_limpio), token),
+                )
+                fila_publica = cur_publico.fetchone()
+                if fila_publica:
+                    cedula_guardada = re.sub(r"\D", "", str(fila_publica[2] or ""))
+                    if cedula_guardada[-4:] == ultimos_cedula:
+                        resultado = fila_publica
+                        st.session_state.seguimiento_resultado = fila_publica
+                        st.session_state.seguimiento_consultado_id = int(fila_publica[0])
+                    else:
+                        resultado = None
+                else:
+                    resultado = None
+            except Exception:
+                resultado = None
+            finally:
+                conn_publico.close()
+            if resultado is None:
+                st.session_state.pop("seguimiento_resultado", None)
+                st.session_state.pop("seguimiento_consultado_id", None)
+                st.error("No pudimos validar esos datos. Revisa el número de orden y los últimos 4 dígitos de la cédula.")
+
+    if resultado:
+        oid, cliente, cedula, equipo, estado, fecha, falla, notas = resultado
+        estado_texto = str(estado or "PENDIENTE").upper()
+        if estado_texto == "ENTREGADO":
+            st.warning("Esta orden ya fue entregada. El enlace de seguimiento ya no está disponible.")
+            st.session_state.pop("seguimiento_resultado", None)
+            st.session_state.pop("seguimiento_consultado_id", None)
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.stop()
+
+        estados = ["PENDIENTE", "EN REVISIÓN", "ESPERANDO REPUESTO", "EN PROCESO", "REPARADO", "ENTREGADO"]
+        if estado_texto == "SIN SOLUCIÓN":
+            estados = ["PENDIENTE", "EN REVISIÓN", "SIN SOLUCIÓN"]
+        indice = estados.index(estado_texto) if estado_texto in estados else 0
+        st.markdown(f'<div class="tracking-card"><div style="color:#08783c;font-size:12px;font-weight:800;letter-spacing:1px">ORDEN DE SERVICIO</div><h2 style="margin:8px 0">#{int(oid):04d}</h2><span class="tracking-pill">{escape(estado_texto)}</span><hr><p><b>Cliente:</b> {escape(str(cliente or ""))}</p><p><b>Equipo:</b> {escape(str(equipo or ""))}</p><p><b>Fecha de ingreso:</b> {escape(str(fecha or ""))}</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="tracking-card"><h3 style="margin-top:0">Estado de tu equipo</h3>', unsafe_allow_html=True)
+        for pos, nombre_estado in enumerate(estados):
+            icono = "🟢" if pos < indice else ("🟠" if pos == indice else "⚪")
+            st.markdown(f"**{icono} {nombre_estado.title()}**")
+            if pos == indice:
+                st.caption("Este es el estado actual de tu equipo.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tracking-card"><h3 style="margin-top:0">📷 Evidencias del equipo</h3>', unsafe_allow_html=True)
+        conn_ev_publico = obtener_conexion()
+        cur_ev_publico = conn_ev_publico.cursor()
+        cur_ev_publico.execute("SELECT nombre_archivo, contenido, tipo_mime FROM evidencias_orden WHERE orden_id = ? ORDER BY id ASC", (int(oid),))
+        evidencias_publicas = cur_ev_publico.fetchall()
+        conn_ev_publico.close()
+        if evidencias_publicas:
+            for nombre_archivo, contenido, tipo_mime in evidencias_publicas:
+                st.caption(str(nombre_archivo))
+                st.image(contenido, use_container_width=True)
+        else:
+            st.caption("Todavía no hay evidencias fotográficas disponibles para esta orden.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="tracking-card"><div class="tracking-note">La información se actualiza automáticamente cada vez que consultes este enlace. Cuando la orden pase a ENTREGADO, el seguimiento quedará bloqueado.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="tracking-footer">Consulta protegida con número de orden y últimos 4 dígitos de la cédula.<br>No se muestran precios, abonos, IMEI, firma ni notas internas.</div></div>', unsafe_allow_html=True)
+
+
 # --- ESTILOS VISUALES Y MÓDULOS EN VERDE CON ACTIVO EN ROJO ---
 st.markdown("""
     <style>
@@ -387,11 +509,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- ENLACE PÚBLICO DE SEGUIMIENTO ---
+try:
+    token_seguimiento_publico = str(st.query_params.get("seguimiento", "") or "").strip()
+except Exception:
+    token_seguimiento_publico = ""
+es_seguimiento_publico = bool(token_seguimiento_publico)
+
 # --- SISTEMA DE AUTENTICACIÓN Y SESIÓN PERSISTENTE ---
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
-
-if not st.session_state.autenticado:
+if not st.session_state.autenticado and not es_seguimiento_publico:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #38bdf8;'>🔐 DATACONTROL JD - ACCESO SEGURO</h2>", unsafe_allow_html=True)
     col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
@@ -410,7 +538,7 @@ if not st.session_state.autenticado:
                     st.error("Usuario o contraseña incorrectos.")
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
-else:
+elif st.session_state.autenticado:
     with st.sidebar:
         st.markdown("### ⚙️ Control de Sesión")
         if st.button("🚪 Cerrar Sesión"):
@@ -501,7 +629,8 @@ def inicializar_bd():
         "ALTER TABLE ventas ADD COLUMN vuelto REAL DEFAULT 0",
         "ALTER TABLE ventas ADD COLUMN orden_id INTEGER",
         "ALTER TABLE ventas ADD COLUMN tipo_venta TEXT DEFAULT 'VENTA DIRECTA'",
-        "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT"
+        "ALTER TABLE ordenes_servicio ADD COLUMN firma_path TEXT",
+        "ALTER TABLE ordenes_servicio ADD COLUMN seguimiento_token TEXT"
     ]:
         try:
             cursor.execute(col_sql)
@@ -513,6 +642,10 @@ def inicializar_bd():
     conn.close()
 
 inicializar_bd()
+
+if es_seguimiento_publico:
+    mostrar_seguimiento_publico(token_seguimiento_publico)
+    st.stop()
 
 def obtener_datos_config():
     try:
@@ -1833,6 +1966,7 @@ if cfg['modo_taller'] == 1:
                     conn = obtener_conexion()
                     cursor = conn.cursor()
                     fecha_ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                    token_seguimiento_nuevo = secrets.token_urlsafe(24)
                     for material in st.session_state.materiales_orden:
                         cursor.execute("SELECT stock FROM productos WHERE id = ?", (material["id"],))
                         fila_stock = cursor.fetchone()
@@ -1844,9 +1978,9 @@ if cfg['modo_taller'] == 1:
                                 f"Disponible: {stock_disponible}."
                             )
                             st.stop()
-                    cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar))
+                    cursor.execute('''INSERT INTO ordenes_servicio (cliente, cedula, telefono, direccion, equipo, imei, falla, costo, abono, estado, pin_patron, detalles_chequeo, foto_path, fecha, firma_path, seguimiento_token)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                                   (ot_cliente, ot_cedula, ot_tel, ot_dir, ot_equipo, ot_imei, ot_falla, val_costo, val_abono, "PENDIENTE", patron_guardar, ot_notas, "", fecha_ahora, firma_guardar, token_seguimiento_nuevo))
                     
                     # Obtener el ID real asignado por la base de datos.
                     # Con Turso/libSQL, last_insert_rowid() puede devolver 0 aunque
@@ -1905,10 +2039,19 @@ if cfg['modo_taller'] == 1:
 
                     telefono_nueva_orden = re.sub(r"\D", "", str(ot_tel or ""))
                     if telefono_nueva_orden:
+                        try:
+                            encabezados_app = dict(st.context.headers)
+                        except Exception:
+                            encabezados_app = {}
+                        host_app = encabezados_app.get("X-Forwarded-Host") or encabezados_app.get("Host") or "datacontroljd.streamlit.app"
+                        host_app = str(host_app).split(",")[0].strip()
+                        url_seguimiento_nueva = f"https://{host_app}/?seguimiento={quote(token_seguimiento_nuevo)}"
                         mensaje_nueva_orden = (
                             f"Apreciado(a) {ot_cliente}, se ha generado una orden de servicio "
-                            f"para su equipo {ot_equipo}. Su número de orden es #{nueva_id:04d}. "
-                            "Gracias por confiar en nosotros."
+                            f"para su equipo {ot_equipo}. Su número de orden es #{nueva_id:04d}.\n\n"
+                            f"Consulta el estado de tu equipo aquí:\n{url_seguimiento_nueva}\n\n"
+                            f"Para ingresar, usa el número de orden {nueva_id:04d} y los últimos 4 dígitos de tu cédula.\n\n"
+                            "El estado se actualizará mientras el equipo permanezca en reparación. Gracias por confiar en nosotros."
                         )
                         st.session_state.whatsapp_nueva_orden = (
                             f"https://api.whatsapp.com/send?phone=57{telefono_nueva_orden}"
