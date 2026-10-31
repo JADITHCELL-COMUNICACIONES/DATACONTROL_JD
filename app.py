@@ -2566,21 +2566,52 @@ if cfg['modo_taller'] == 1:
                         )
                         if st.button("💾 Guardar nuevas evidencias", key=f"guardar_evidencias_{oid}", use_container_width=True):
                             if fotos_adicionales:
-                                conn_add_ev = obtener_conexion()
-                                cur_add_ev = conn_add_ev.cursor()
-                                fecha_ev = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
-                                for foto_adicional in fotos_adicionales:
-                                    contenido_adicional = foto_adicional.getvalue()
-                                    if contenido_adicional:
+                                conn_add_ev = None
+                                evidencias_guardadas = 0
+                                try:
+                                    conn_add_ev = obtener_conexion()
+                                    cur_add_ev = conn_add_ev.cursor()
+                                    fecha_ev = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+                                    for foto_adicional in fotos_adicionales:
+                                        contenido_original = foto_adicional.getvalue()
+                                        if not contenido_original:
+                                            continue
+                                        # Las fotos de teléfonos pueden superar varios MB.
+                                        # Se normalizan para evitar errores de commit en Turso.
+                                        try:
+                                            imagen_ev = Image.open(io.BytesIO(contenido_original))
+                                            imagen_ev = imagen_ev.convert("RGB")
+                                            imagen_ev.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                                            buffer_ev = io.BytesIO()
+                                            imagen_ev.save(buffer_ev, format="JPEG", quality=82, optimize=True)
+                                            contenido_adicional = buffer_ev.getvalue()
+                                            nombre_ev = f"{Path(foto_adicional.name).stem}.jpg"
+                                            tipo_ev = "image/jpeg"
+                                        except Exception:
+                                            # Si el archivo no puede convertirse, se intenta guardar
+                                            # el contenido original para conservar compatibilidad.
+                                            contenido_adicional = contenido_original
+                                            nombre_ev = foto_adicional.name
+                                            tipo_ev = foto_adicional.type or "image/jpeg"
                                         cur_add_ev.execute(
                                             "INSERT INTO evidencias_orden (orden_id, nombre_archivo, contenido, tipo_mime, fecha) VALUES (?, ?, ?, ?, ?)",
-                                            (oid, foto_adicional.name, contenido_adicional, foto_adicional.type or "image/jpeg", fecha_ev),
+                                            (int(oid), nombre_ev, contenido_adicional, tipo_ev, fecha_ev),
                                         )
-                                conn_add_ev.commit()
-                                conn_add_ev.close()
-                                st.session_state[f"mostrar_cargador_evidencias_{oid}"] = False
-                                st.success("Evidencias agregadas correctamente.")
-                                st.rerun()
+                                        conn_add_ev.commit()
+                                        evidencias_guardadas += 1
+                                    conn_add_ev.close()
+                                    st.session_state[f"mostrar_cargador_evidencias_{oid}"] = False
+                                    st.success(f"{evidencias_guardadas} evidencia(s) agregada(s) correctamente.")
+                                    st.rerun()
+                                except Exception as error_evidencias:
+                                    if conn_add_ev is not None:
+                                        try:
+                                            conn_add_ev.rollback()
+                                            conn_add_ev.close()
+                                        except Exception:
+                                            pass
+                                    st.error("No se pudieron guardar las evidencias. Intenta con fotos JPG/PNG más pequeñas.")
+                                    st.caption(f"Detalle técnico: {type(error_evidencias).__name__}")
                             else:
                                 st.warning("Selecciona al menos una imagen.")
 
