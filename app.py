@@ -245,7 +245,7 @@ def consultar_dataframe(conn, query, params=None):
 
 
 # --- PROGRAMA DE FIDELIZACIÓN ---
-PUNTOS_POR_BLOQUE = 3          # 3 puntos por cada $10.000 pagados
+PUNTOS_POR_BLOQUE = 2          # 2 puntos por cada $10.000 pagados (2 %)
 VALOR_BLOQUE_PUNTOS = 10000.0
 VALOR_POR_PUNTO = 100.0        # 100 puntos = $10.000 de descuento
 
