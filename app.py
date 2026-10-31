@@ -395,6 +395,58 @@ def redimir_puntos_cliente(conn, claves, puntos_a_redimir, cliente, telefono):
     return True, f"Se redimieron {puntos_solicitados} puntos (${puntos_solicitados * VALOR_POR_PUNTO:,.0f})."
 
 
+def unificar_clientes_puntos(conn, claves, nueva_cedula, nuevo_nombre, nuevo_telefono):
+    """Consolida registros de puntos, corrige datos y mueve todo el historial."""
+    nombre_final = str(nuevo_nombre or "").strip()
+    clave_final = clave_cliente_puntos(nueva_cedula, nombre_final)
+    if not clave_final or not nombre_final:
+        return False, "El nombre y la cédula (o el nombre si no tiene cédula) son obligatorios."
+    claves_unicas = list(dict.fromkeys(str(clave) for clave in claves if str(clave).strip()))
+    if len(claves_unicas) < 2:
+        return False, "Selecciona dos registros diferentes para unificarlos."
+
+    cursor = conn.cursor()
+    marcadores = ",".join("?" for _ in claves_unicas)
+    cursor.execute(
+        f"SELECT cedula, puntos_disponibles FROM clientes_puntos WHERE cedula IN ({marcadores})",
+        tuple(claves_unicas),
+    )
+    filas = cursor.fetchall()
+    puntos_totales = sum(int(fila[1] or 0) for fila in filas)
+    ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        "SELECT id, tipo_movimiento, referencia FROM movimientos_puntos WHERE cedula IN (" + marcadores + ")",
+        tuple(claves_unicas),
+    )
+    movimientos = cursor.fetchall()
+    for movimiento_id, tipo_movimiento, referencia in movimientos:
+        cursor.execute(
+            "SELECT id FROM movimientos_puntos WHERE cedula = ? AND tipo_movimiento = ? AND referencia = ? AND id <> ?",
+            (clave_final, tipo_movimiento, referencia, movimiento_id),
+        )
+        if cursor.fetchone():
+            cursor.execute("DELETE FROM movimientos_puntos WHERE id = ?", (movimiento_id,))
+        else:
+            cursor.execute(
+                "UPDATE movimientos_puntos SET cedula = ?, cliente = ? WHERE id = ?",
+                (clave_final, nombre_final, movimiento_id),
+            )
+
+    cursor.execute(
+        "DELETE FROM clientes_puntos WHERE cedula IN (" + marcadores + ")",
+        tuple(claves_unicas),
+    )
+    cursor.execute(
+        "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(cedula) DO UPDATE SET cliente=excluded.cliente, telefono=excluded.telefono, "
+        "puntos_disponibles=clientes_puntos.puntos_disponibles + excluded.puntos_disponibles, actualizado=excluded.actualizado",
+        (clave_final, nombre_final, str(nuevo_telefono or "").strip(), puntos_totales, ahora),
+    )
+    conn.commit()
+    return True, f"Cliente unificado correctamente con {puntos_totales} puntos."
+
+
 def obtener_puntos_cliente(cedula, cliente=""):
     """Devuelve solo los puntos; usa nombre cuando falta la cédula."""
     cedula_limpia = clave_cliente_puntos(cedula, cliente)
@@ -1536,6 +1588,46 @@ with tabs[2]:
     )
     filas_puntos = cur_puntos_ui.fetchall()
     conn_puntos_ui.close()
+
+    with st.expander("🔗 Unificar o corregir cliente", expanded=False):
+        st.caption("Selecciona dos registros de la misma persona para sumar sus puntos y conservar todos sus movimientos.")
+        if len(filas_puntos) < 2:
+            st.info("Se necesitan al menos dos registros para unificar.")
+        else:
+            opciones_unificacion = {
+                f"{fila[1] or 'Sin nombre'} · {fila[0]} · {int(fila[3] or 0)} puntos": str(fila[0])
+                for fila in filas_puntos
+            }
+            etiquetas_unificacion = list(opciones_unificacion.keys())
+            col_uni1, col_uni2 = st.columns(2)
+            with col_uni1:
+                registro_uni_a = st.selectbox("Primer registro", etiquetas_unificacion, key="unificar_registro_a")
+            with col_uni2:
+                registro_uni_b = st.selectbox("Segundo registro", etiquetas_unificacion, index=min(1, len(etiquetas_unificacion) - 1), key="unificar_registro_b")
+            claves_uni = [opciones_unificacion[registro_uni_a], opciones_unificacion[registro_uni_b]]
+            fila_destino_uni = next((fila for fila in filas_puntos if str(fila[0]) == claves_uni[0]), filas_puntos[0])
+            uni_nombre = st.text_input("Nombre correcto del cliente", value=str(fila_destino_uni[1] or ""), key="unificar_nombre_final")
+            uni_cedula = st.text_input("Cédula correcta (déjala vacía si no tiene)", value="" if str(fila_destino_uni[0]).startswith("NOMBRE:") else str(fila_destino_uni[0]), key="unificar_cedula_final")
+            uni_telefono = st.text_input("Teléfono correcto", value=str(fila_destino_uni[2] or ""), key="unificar_telefono_final")
+            confirmar_uni = st.checkbox("Confirmo que los dos registros pertenecen a la misma persona", key="confirmar_unificacion")
+            if st.button("🔗 Unificar puntos y movimientos", type="primary", use_container_width=True, key="btn_unificar_clientes"):
+                if not confirmar_uni:
+                    st.warning("Marca la confirmación antes de unificar.")
+                elif claves_uni[0] == claves_uni[1]:
+                    st.error("Selecciona dos registros diferentes.")
+                else:
+                    conn_uni = obtener_conexion()
+                    try:
+                        exito_uni, mensaje_uni = unificar_clientes_puntos(
+                            conn_uni, claves_uni, uni_cedula, uni_nombre, uni_telefono
+                        )
+                    finally:
+                        conn_uni.close()
+                    if exito_uni:
+                        st.success(mensaje_uni)
+                        st.rerun()
+                    else:
+                        st.error(mensaje_uni)
 
     # Agrupa registros antiguos por nombre y teléfono, conservando una sola tarjeta
     # aunque antes se hubieran guardado con cédula y luego por nombre.
