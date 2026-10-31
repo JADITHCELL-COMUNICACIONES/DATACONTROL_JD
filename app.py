@@ -264,9 +264,9 @@ def mostrar_seguimiento_publico(token):
         pass
     logo_publico_html = (
         f'<img src="data:image/png;base64,{logo_publico_b64}" alt="Logo del negocio" '
-        'style="width:58px;height:58px;object-fit:contain;background:#fff;border-radius:50%;padding:4px;display:block;" />'
+        'style="width:86px;height:86px;object-fit:contain;background:#fff;border-radius:50%;padding:5px;display:block;" />'
         if logo_publico_b64 else
-        '<div style="width:58px;height:58px;border-radius:50%;background:#fff;color:#08783c;display:grid;place-items:center;font-weight:900;font-size:19px;">JD</div>'
+        '<div style="width:86px;height:86px;border-radius:50%;background:#fff;color:#08783c;display:grid;place-items:center;font-weight:900;font-size:25px;">JD</div>'
     )
     st.markdown("""
     <style>
