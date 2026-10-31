@@ -246,10 +246,33 @@ def consultar_dataframe(conn, query, params=None):
 @st.fragment(run_every="10s")
 def mostrar_seguimiento_publico(token):
     """Vista pública: solo permite consultar una orden con token + orden + últimos 4 de cédula."""
+    logo_publico_b64 = ""
+    empresa_publica = "DATACONTROL JD"
+    try:
+        conn_logo_publico = obtener_conexion()
+        cur_logo_publico = conn_logo_publico.cursor()
+        cur_logo_publico.execute("SELECT nombre_empresa, logo_path FROM configuracion WHERE id = 1")
+        fila_logo_publico = cur_logo_publico.fetchone()
+        conn_logo_publico.close()
+        if fila_logo_publico:
+            empresa_publica = str(fila_logo_publico[0] or empresa_publica)
+            ruta_logo_publico = str(fila_logo_publico[1] or "")
+            if ruta_logo_publico and os.path.exists(ruta_logo_publico):
+                with open(ruta_logo_publico, "rb") as archivo_logo_publico:
+                    logo_publico_b64 = base64.b64encode(archivo_logo_publico.read()).decode("ascii")
+    except Exception:
+        pass
+    logo_publico_html = (
+        f'<img src="data:image/png;base64,{logo_publico_b64}" alt="Logo del negocio" '
+        'style="width:58px;height:58px;object-fit:contain;background:#fff;border-radius:50%;padding:4px;display:block;" />'
+        if logo_publico_b64 else
+        '<div style="width:58px;height:58px;border-radius:50%;background:#fff;color:#08783c;display:grid;place-items:center;font-weight:900;font-size:19px;">JD</div>'
+    )
     st.markdown("""
     <style>
       .tracking-shell { max-width: 720px; margin: 0 auto; }
       .tracking-hero { background: linear-gradient(135deg,#08783c,#18a957); color:white; padding:28px; border-radius:0 0 24px 24px; }
+      .tracking-brand { display:flex; align-items:center; gap:14px; }
       .tracking-card { background:#ffffff; border:1px solid #dce9e0; border-radius:18px; padding:22px; margin:18px auto; box-shadow:0 7px 22px rgba(31,72,51,.08); color:#17212b; }
       .tracking-pill { display:inline-block; background:#fff4d9; color:#9b6200; border-radius:99px; padding:7px 12px; font-weight:800; font-size:13px; }
       .tracking-note { background:#f0faf4; border-left:4px solid #18a957; border-radius:10px; padding:13px; color:#285d40; }
@@ -257,7 +280,7 @@ def mostrar_seguimiento_publico(token):
     </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="tracking-shell">', unsafe_allow_html=True)
-    st.markdown('<div class="tracking-hero"><h1 style="margin:0 0 8px">DATACONTROL JD</h1><div>Seguimiento de servicio técnico</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="tracking-hero"><div class="tracking-brand">{logo_publico_html}<div><div style="font-size:18px;font-weight:800;">Seguimiento de servicio técnico</div></div></div></div>', unsafe_allow_html=True)
     st.markdown('<div class="tracking-card"><h2 style="margin-top:0">Consulta tu reparación</h2><p>Ingresa los datos que aparecen en el mensaje de WhatsApp.</p>', unsafe_allow_html=True)
     with st.form("form_consulta_seguimiento"):
         numero_consulta = st.text_input("Número de orden", placeholder="Ejemplo: 0120 o 120")
