@@ -258,10 +258,21 @@ def calcular_puntos(valor_pagado):
         return 0
 
 
+def clave_cliente_puntos(cedula, cliente):
+    """Usa la cédula como clave; si falta, usa el nombre normalizado."""
+    cedula_limpia = re.sub(r"\s+", "", str(cedula or "")).strip()
+    if cedula_limpia and cedula_limpia.upper() not in {"N/A", "NA", "SINCC", "SINCEDULA"}:
+        return cedula_limpia
+    nombre_limpio = " ".join(str(cliente or "").strip().upper().split())
+    if not nombre_limpio or nombre_limpio == "CONSUMIDOR FINAL":
+        return ""
+    return f"NOMBRE:{nombre_limpio}"
+
+
 def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimiento, referencia, detalle):
     """Registra una bonificación una sola vez y actualiza el saldo del cliente."""
-    cedula_limpia = str(cedula or "").strip()
-    if not cedula_limpia or cedula_limpia.upper() in {"N/A", "NA", "CONSUMIDOR FINAL"}:
+    cedula_limpia = clave_cliente_puntos(cedula, cliente)
+    if not cedula_limpia:
         return 0
     puntos = calcular_puntos(valor_pagado)
     if puntos <= 0:
@@ -285,6 +296,22 @@ def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimie
         (cedula_limpia, str(cliente or "").strip(), puntos, tipo_movimiento, str(referencia), float(valor_pagado or 0), detalle, fecha_puntos),
     )
     return puntos
+
+
+def obtener_puntos_cliente(cedula, cliente=""):
+    """Devuelve solo los puntos; usa nombre cuando falta la cédula."""
+    cedula_limpia = clave_cliente_puntos(cedula, cliente)
+    if not cedula_limpia:
+        return 0
+    try:
+        conn = obtener_conexion()
+        cursor = conn.cursor()
+        cursor.execute("SELECT puntos_disponibles FROM clientes_puntos WHERE cedula = ?", (cedula_limpia,))
+        fila = cursor.fetchone()
+        conn.close()
+        return int(fila[0] or 0) if fila else 0
+    except Exception:
+        return 0
 
 
 @st.fragment(run_every="10s")
@@ -1049,7 +1076,8 @@ with tabs[0]:
                         "vuelto": vuelto_calc if vuelto_calc > 0 else 0.0,
                         "imei1": v_imei1,
                         "imei2": v_imei2,
-                        "notas": v_notas
+                        "notas": v_notas,
+                        "puntos_acumulados": obtener_puntos_cliente(cedula_venta, cliente_venta),
                     }
                     st.session_state.carrito = []
                     st.success("¡Venta procesada con éxito!")
@@ -1103,6 +1131,7 @@ with tabs[0]:
                 f" TOTAL: ${rg['subtotal']:,.0f}",
                 f" RECIBIDO: ${rg['recibido']:,.0f}",
                 f" CAMBIO: ${rg['vuelto']:,.0f}",
+                f" PUNTOS ACUMULADOS: {obtener_puntos_cliente(rg['cedula'], rg['cliente'])}",
                 f"==========================================",
                 f" IMEI 1: {rg['imei1']}" if rg['imei1'] else "",
                 f" NOTAS DEL PEDIDO:\n {rg['notas']}" if rg.get('notas') else "",
@@ -1300,6 +1329,7 @@ with tabs[1]:
                 total_reimpresion = float(venta_rows["Total"].sum())
                 recibido_reimpresion = float(primera_fila["Recibido"] or total_reimpresion)
                 cambio_reimpresion = float(primera_fila["Cambio"] or 0.0)
+                puntos_reimpresion = obtener_puntos_cliente(primera_fila["Cédula"], primera_fila["Cliente"])
                 lineas_reimpresion = [
                     "==========================================",
                     f"   {cfg['empresa']}",
@@ -1326,6 +1356,7 @@ with tabs[1]:
                     f" TOTAL: ${total_reimpresion:,.0f}",
                     f" RECIBIDO: ${recibido_reimpresion:,.0f}",
                     f" CAMBIO: ${cambio_reimpresion:,.0f}",
+                    f" PUNTOS ACUMULADOS: {puntos_reimpresion}",
                     "==========================================",
                     f" IMEI 1: {primera_fila['IMEI']}" if primera_fila['IMEI'] else "",
                     f" NOTAS DEL PEDIDO:\n {primera_fila['Notas']}" if primera_fila['Notas'] else "",
@@ -1377,8 +1408,8 @@ with tabs[2]:
     st.caption("3 puntos por cada $10.000 efectivamente pagados en ventas y abonos de reparaciones.")
     st.info("Cada punto equivale a $100 de bonificación. Por ejemplo: 100 puntos = $10.000.")
     cedula_puntos_busqueda = st.text_input(
-        "Buscar cliente por cédula",
-        placeholder="Escribe la cédula del cliente...",
+        "Buscar cliente por cédula o nombre",
+        placeholder="Escribe la cédula o el nombre...",
         key="buscar_cedula_puntos",
     )
     conn_puntos_ui = obtener_conexion()
@@ -1386,8 +1417,8 @@ with tabs[2]:
     if cedula_puntos_busqueda.strip():
         cedula_ui = cedula_puntos_busqueda.strip()
         cur_puntos_ui.execute(
-            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos WHERE cedula LIKE ?",
-            (f"%{cedula_ui}%",),
+            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos WHERE cedula LIKE ? OR cliente LIKE ?",
+            (f"%{cedula_ui}%", f"%{cedula_ui}%"),
         )
         clientes_puntos_ui = cur_puntos_ui.fetchall()
     else:
@@ -1397,14 +1428,15 @@ with tabs[2]:
         clientes_puntos_ui = cur_puntos_ui.fetchall()
     conn_puntos_ui.close()
     if not clientes_puntos_ui:
-        st.info("Todavía no hay clientes con puntos acumulados. Los puntos aparecerán después de registrar una venta o un abono con cédula.")
+        st.info("Todavía no hay clientes con puntos acumulados. Los puntos aparecerán después de registrar una venta o un abono con cédula o nombre.")
     else:
         for cedula_ui, cliente_ui, telefono_ui, puntos_ui, actualizado_ui in clientes_puntos_ui:
             valor_ui = float(puntos_ui or 0) * VALOR_POR_PUNTO
             p_col1, p_col2, p_col3 = st.columns([2, 1, 1])
             with p_col1:
                 st.markdown(f"**{cliente_ui or 'Cliente sin nombre'}**  ")
-                st.caption(f"Cédula: {cedula_ui} · Tel: {telefono_ui or 'N/A'}")
+                identificador_ui = "Sin cédula (por nombre)" if str(cedula_ui).startswith("NOMBRE:") else f"Cédula: {cedula_ui}"
+                st.caption(f"{identificador_ui} · Tel: {telefono_ui or 'N/A'}")
             with p_col2:
                 st.metric("Puntos", int(puntos_ui or 0))
             with p_col3:
@@ -2283,6 +2315,7 @@ if cfg['modo_taller'] == 1:
             except (TypeError, ValueError):
                 rt_abono = 0.0
             saldo_r = rt_costo - rt_abono
+            puntos_rt = obtener_puntos_cliente(rt.get("cedula"), rt.get("cliente"))
             fecha_taller_actual = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
             materiales_ticket = "\n".join(
                 f" {material['cantidad']} x {material['nombre'][:30]}"
@@ -2323,6 +2356,7 @@ if cfg['modo_taller'] == 1:
  TOTAL ABONADO: ${rt_abono:,.2f}
  SALDO PENDIENTE: ${saldo_r:,.2f}
  ESTADO ACTUAL: {rt['estado']}
+ PUNTOS ACUMULADOS: {puntos_rt}
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
@@ -2355,6 +2389,7 @@ if cfg['modo_taller'] == 1:
  TOTAL ABONADO: ${rt_abono:,.2f}
  SALDO PENDIENTE: ${saldo_r:,.2f}
  ESTADO ACTUAL: {rt['estado']}
+ PUNTOS ACUMULADOS: {puntos_rt}
 ==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
@@ -3023,9 +3058,11 @@ if cfg['modo_taller'] == 1:
                             cursor = conn.cursor()
                             total_final_abono = c_abo + nuevo_abono_suma
                             puntos_liquidacion_entrega = 0.0
-                            if nuevo_estado_edit == "ENTREGADO":
+                            estado_anterior_orden = str(ord_data[10] or "").strip().upper()
+                            if nuevo_estado_edit == "ENTREGADO" and estado_anterior_orden == "REPARADO":
                                 # Al entregar el equipo se considera cancelado el saldo
                                 # restante, aunque no se registre como abono manual.
+                                # Los equipos sin reparación no generan esta bonificación.
                                 puntos_liquidacion_entrega = max(
                                     float(nuevo_costo_edit) - c_abo - nuevo_abono_suma,
                                     0.0,
@@ -3051,7 +3088,11 @@ if cfg['modo_taller'] == 1:
                                     oid,
                                 ),
                             )
-                            if nuevo_estado_edit == "ENTREGADO" and puntos_liquidacion_entrega > 0:
+                            if (
+                                nuevo_estado_edit == "ENTREGADO"
+                                and estado_anterior_orden == "REPARADO"
+                                and puntos_liquidacion_entrega > 0
+                            ):
                                 registrar_puntos(
                                     conn,
                                     ord_data[2],
@@ -3141,6 +3182,7 @@ if cfg['modo_taller'] == 1:
                         )
                         fecha_ingreso_copia = str(ord_data[13] or "").replace("T", " ")[:16]
                         fecha_impresion_copia = str(fecha_copia)[:16]
+                        puntos_orden_copia = obtener_puntos_cliente(ord_data[2], ord_data[1])
                         ticket_copia_cliente = f"""
 ==========================================
    {cfg['empresa']}
@@ -3163,9 +3205,10 @@ if cfg['modo_taller'] == 1:
 ------------------------------------------
  COSTO TOTAL: ${c_tot:,.2f}
  TOTAL ABONADO: ${c_abo:,.2f}
- SALDO PENDIENTE: ${saldo_copia:,.2f}
- ESTADO ACTUAL: {nuevo_estado_edit}
-==========================================
+	 SALDO PENDIENTE: ${saldo_copia:,.2f}
+	 ESTADO ACTUAL: {nuevo_estado_edit}
+	 PUNTOS ACUMULADOS: {puntos_orden_copia}
+	==========================================
 {cfg['garantia_taller']}
 ------------------------------------------
 """.strip()
