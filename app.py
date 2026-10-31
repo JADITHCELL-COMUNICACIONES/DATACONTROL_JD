@@ -395,6 +395,51 @@ def redimir_puntos_cliente(conn, claves, puntos_a_redimir, cliente, telefono):
     return True, f"Se redimieron {puntos_solicitados} puntos (${puntos_solicitados * VALOR_POR_PUNTO:,.0f})."
 
 
+def ajustar_puntos_cliente(conn, cedula, cliente, telefono, ajuste, motivo):
+    """Aplica una corrección administrativa de puntos y la deja en el historial."""
+    ajuste = int(ajuste or 0)
+    clave = clave_cliente_puntos(cedula, cliente)
+    nombre = str(cliente or "").strip()
+    if not clave or not nombre:
+        return False, "Indica el nombre y la cédula o el nombre del cliente."
+    if ajuste == 0:
+        return False, "El ajuste no puede ser cero."
+    if not str(motivo or "").strip():
+        return False, "Escribe el motivo de la corrección."
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT puntos_disponibles FROM clientes_puntos WHERE cedula = ?", (clave,))
+    fila = cursor.fetchone()
+    saldo_actual = int(fila[0] or 0) if fila else 0
+    saldo_nuevo = saldo_actual + ajuste
+    if saldo_nuevo < 0:
+        return False, f"El ajuste dejaría el saldo en negativo. Saldo actual: {saldo_actual} puntos."
+
+    ahora = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(
+        "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(cedula) DO UPDATE SET cliente=excluded.cliente, telefono=excluded.telefono, "
+        "puntos_disponibles=excluded.puntos_disponibles, actualizado=excluded.actualizado",
+        (clave, nombre, str(telefono or "").strip(), saldo_nuevo, ahora),
+    )
+    cursor.execute(
+        "INSERT INTO movimientos_puntos (cedula, cliente, puntos, tipo_movimiento, referencia, valor_pagado, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            clave,
+            nombre,
+            ajuste,
+            "CORRECCION ADMINISTRATIVA",
+            f"CORRECCION-{ahora.replace('-', '').replace(':', '').replace(' ', '')}-{clave}",
+            0.0,
+            str(motivo).strip(),
+            ahora,
+        ),
+    )
+    conn.commit()
+    accion = "agregaron" if ajuste > 0 else "retiraron"
+    return True, f"Se {accion} {abs(ajuste)} punto(s). Nuevo saldo: {saldo_nuevo} puntos."
+
+
 def unificar_clientes_puntos(conn, claves, nueva_cedula, nuevo_nombre, nuevo_telefono):
     """Consolida registros de puntos, corrige datos y mueve todo el historial."""
     nombre_final = str(nuevo_nombre or "").strip()
@@ -1637,9 +1682,24 @@ with tabs[2]:
                 registro_uni_b = st.selectbox("Segundo registro", etiquetas_unificacion, index=min(1, len(etiquetas_unificacion) - 1), key="unificar_registro_b")
             claves_uni = [opciones_unificacion[registro_uni_a], opciones_unificacion[registro_uni_b]]
             fila_destino_uni = next((fila for fila in filas_puntos if str(fila[0]) == claves_uni[0]), filas_puntos[0])
-            uni_nombre = st.text_input("Nombre correcto del cliente", value=str(fila_destino_uni[1] or ""), key="unificar_nombre_final")
-            uni_cedula = st.text_input("Cédula correcta (déjala vacía si no tiene)", value="" if str(fila_destino_uni[0]).startswith("NOMBRE:") else str(fila_destino_uni[0]), key="unificar_cedula_final")
-            uni_telefono = st.text_input("Teléfono correcto", value=str(fila_destino_uni[2] or ""), key="unificar_telefono_final")
+            # La clave incluye el registro seleccionado para evitar que Streamlit
+            # conserve los datos del cliente anterior al cambiar el selectbox.
+            clave_formulario_uni = re.sub(r"[^a-zA-Z0-9_]", "_", str(claves_uni[0]))
+            uni_nombre = st.text_input(
+                "Nombre correcto del cliente",
+                value=str(fila_destino_uni[1] or ""),
+                key=f"unificar_nombre_final_{clave_formulario_uni}",
+            )
+            uni_cedula = st.text_input(
+                "Cédula correcta (déjala vacía si no tiene)",
+                value="" if str(fila_destino_uni[0]).startswith("NOMBRE:") else str(fila_destino_uni[0]),
+                key=f"unificar_cedula_final_{clave_formulario_uni}",
+            )
+            uni_telefono = st.text_input(
+                "Teléfono correcto",
+                value=str(fila_destino_uni[2] or ""),
+                key=f"unificar_telefono_final_{clave_formulario_uni}",
+            )
             confirmar_uni = st.checkbox("Confirmo que los dos registros pertenecen a la misma persona", key="confirmar_unificacion")
             if st.button("🔗 Unificar puntos y movimientos", type="primary", use_container_width=True, key="btn_unificar_clientes"):
                 if not confirmar_uni:
@@ -1659,6 +1719,39 @@ with tabs[2]:
                         st.rerun()
                     else:
                         st.error(mensaje_uni)
+
+    with st.expander("🛠️ Corrección manual de puntos", expanded=False):
+        st.caption("Usa esta opción solo para corregir errores administrativos. No modifica ventas, órdenes ni recibos.")
+        opciones_correccion = {"➕ Nuevo cliente": ""}
+        for fila in filas_puntos:
+            opciones_correccion[f"{fila[1] or 'Sin nombre'} · {fila[0]} · {int(fila[3] or 0)} puntos"] = str(fila[0])
+        etiquetas_correccion = list(opciones_correccion.keys())
+        seleccion_correccion = st.selectbox("Cliente que recibirá la corrección", etiquetas_correccion, key="correccion_cliente_seleccionado")
+        clave_correccion = opciones_correccion[seleccion_correccion]
+        fila_correccion = next((fila for fila in filas_puntos if str(fila[0]) == clave_correccion), ("", "", "", 0, ""))
+        base_correccion = re.sub(r"[^a-zA-Z0-9_]", "_", clave_correccion or "nuevo")
+        nombre_correccion = st.text_input("Nombre del cliente", value=str(fila_correccion[1] or ""), key=f"correccion_nombre_{base_correccion}")
+        cedula_correccion = st.text_input("Cédula (déjala vacía si no tiene)", value="" if str(clave_correccion).startswith("NOMBRE:") else str(clave_correccion or ""), key=f"correccion_cedula_{base_correccion}")
+        telefono_correccion = st.text_input("Teléfono", value=str(fila_correccion[2] or ""), key=f"correccion_telefono_{base_correccion}")
+        ajuste_correccion = st.number_input("Puntos a ajustar (usa negativo para retirar)", min_value=-100000, max_value=100000, value=0, step=1, key=f"correccion_ajuste_{base_correccion}")
+        motivo_correccion = st.text_input("Motivo", placeholder="Ejemplo: recuperar 20 puntos de Fray por corrección de cliente", key=f"correccion_motivo_{base_correccion}")
+        confirmar_correccion = st.checkbox("Confirmo que esta corrección es correcta", key=f"confirmar_correccion_{base_correccion}")
+        if st.button("🛠️ Aplicar corrección administrativa", type="primary", use_container_width=True, key="btn_aplicar_correccion_puntos"):
+            if not confirmar_correccion:
+                st.warning("Marca la confirmación antes de aplicar la corrección.")
+            else:
+                conn_corr = obtener_conexion()
+                try:
+                    exito_corr, mensaje_corr = ajustar_puntos_cliente(
+                        conn_corr, cedula_correccion, nombre_correccion, telefono_correccion, ajuste_correccion, motivo_correccion
+                    )
+                finally:
+                    conn_corr.close()
+                if exito_corr:
+                    st.success(mensaje_corr)
+                    st.rerun()
+                else:
+                    st.error(mensaje_corr)
 
     # Agrupa registros antiguos por nombre y teléfono, conservando una sola tarjeta
     # aunque antes se hubieran guardado con cédula y luego por nombre.
