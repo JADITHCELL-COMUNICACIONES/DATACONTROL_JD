@@ -20,6 +20,7 @@ import io
 import hashlib
 import zipfile
 import secrets
+import unicodedata
 from html import escape
 
 
@@ -269,6 +270,13 @@ def clave_cliente_puntos(cedula, cliente):
     return f"NOMBRE:{nombre_limpio}"
 
 
+def normalizar_nombre_consulta(valor):
+    """Normaliza mayúsculas, tildes y espacios para comparar nombres."""
+    texto = unicodedata.normalize("NFKD", str(valor or ""))
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return " ".join(texto.upper().split())
+
+
 def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimiento, referencia, detalle):
     """Registra una bonificación una sola vez y actualiza el saldo del cliente."""
     cedula_limpia = clave_cliente_puntos(cedula, cliente)
@@ -355,7 +363,18 @@ def mostrar_seguimiento_publico(token):
     st.markdown('<div class="tracking-card"><h2 style="margin-top:0">Consulta tu reparación</h2><p>Ingresa los datos que aparecen en el mensaje de WhatsApp.</p>', unsafe_allow_html=True)
     with st.form("form_consulta_seguimiento"):
         numero_consulta = st.text_input("Número de orden", placeholder="Ejemplo: 0120 o 120")
-        cedula_consulta = st.text_input("Últimos 4 dígitos de la cédula", max_chars=4, placeholder="Ejemplo: 2858")
+        metodo_consulta = st.radio(
+            "Validar consulta con",
+            ["Cédula", "Nombre completo", "Teléfono"],
+            horizontal=True,
+            key="metodo_validacion_seguimiento",
+        )
+        if metodo_consulta == "Cédula":
+            dato_consulta = st.text_input("Últimos 4 dígitos de la cédula", max_chars=4, placeholder="Ejemplo: 2858")
+        elif metodo_consulta == "Nombre completo":
+            dato_consulta = st.text_input("Nombre completo del cliente", placeholder="Ejemplo: José Martínez")
+        else:
+            dato_consulta = st.text_input("Últimos 4 dígitos del teléfono", max_chars=4, placeholder="Ejemplo: 5590")
         consultar = st.form_submit_button("🔎 Consultar estado", type="primary", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -368,7 +387,7 @@ def mostrar_seguimiento_publico(token):
         cur_refresco = conn_refresco.cursor()
         try:
             cur_refresco.execute(
-                """SELECT id, cliente, cedula, equipo, estado, fecha, falla, detalles_chequeo
+                """SELECT id, cliente, cedula, telefono, equipo, estado, fecha, falla, detalles_chequeo
                    FROM ordenes_servicio
                    WHERE id = ? AND seguimiento_token = ?""",
                 (int(consulta_id_guardada), token),
@@ -385,16 +404,17 @@ def mostrar_seguimiento_publico(token):
             conn_refresco.close()
     if consultar:
         numero_limpio = re.sub(r"\D", "", str(numero_consulta or ""))
-        ultimos_cedula = re.sub(r"\D", "", str(cedula_consulta or ""))[-4:]
-        if not numero_limpio or not ultimos_cedula or len(ultimos_cedula) != 4:
-            st.error("Escribe el número de orden y exactamente los últimos 4 dígitos de la cédula.")
+        dato_limpio = str(dato_consulta or "").strip()
+        dato_digitos = re.sub(r"\D", "", dato_limpio)[-4:]
+        if not numero_limpio or not dato_limpio:
+            st.error("Escribe el número de orden y el dato de validación solicitado.")
             resultado = None
         else:
             conn_publico = obtener_conexion()
             cur_publico = conn_publico.cursor()
             try:
                 cur_publico.execute(
-                    """SELECT id, cliente, cedula, equipo, estado, fecha, falla, detalles_chequeo
+                    """SELECT id, cliente, cedula, telefono, equipo, estado, fecha, falla, detalles_chequeo
                        FROM ordenes_servicio
                        WHERE id = ? AND seguimiento_token = ?""",
                     (int(numero_limpio), token),
@@ -402,7 +422,15 @@ def mostrar_seguimiento_publico(token):
                 fila_publica = cur_publico.fetchone()
                 if fila_publica:
                     cedula_guardada = re.sub(r"\D", "", str(fila_publica[2] or ""))
-                    if cedula_guardada[-4:] == ultimos_cedula:
+                    telefono_guardado = re.sub(r"\D", "", str(fila_publica[3] or ""))
+                    nombre_guardado = normalizar_nombre_consulta(fila_publica[1])
+                    if metodo_consulta == "Cédula":
+                        validacion_ok = bool(cedula_guardada) and len(dato_digitos) == 4 and cedula_guardada[-4:] == dato_digitos
+                    elif metodo_consulta == "Nombre completo":
+                        validacion_ok = not cedula_guardada and normalizar_nombre_consulta(dato_limpio) == nombre_guardado
+                    else:
+                        validacion_ok = not cedula_guardada and len(dato_digitos) == 4 and telefono_guardado[-4:] == dato_digitos
+                    if validacion_ok:
                         resultado = fila_publica
                         st.session_state.seguimiento_resultado = fila_publica
                         st.session_state.seguimiento_consultado_id = int(fila_publica[0])
@@ -417,10 +445,10 @@ def mostrar_seguimiento_publico(token):
             if resultado is None:
                 st.session_state.pop("seguimiento_resultado", None)
                 st.session_state.pop("seguimiento_consultado_id", None)
-                st.error("No pudimos validar esos datos. Revisa el número de orden y los últimos 4 dígitos de la cédula.")
+                st.error("No pudimos validar esos datos. Revisa el número de orden y el dato de validación ingresado.")
 
     if resultado:
-        oid, cliente, cedula, equipo, estado, fecha, falla, notas = resultado
+        oid, cliente, cedula, telefono, equipo, estado, fecha, falla, notas = resultado
         estado_texto = str(estado or "PENDIENTE").upper()
         if estado_texto == "ENTREGADO":
             st.warning("Esta orden ya fue entregada. El enlace de seguimiento ya no está disponible.")
@@ -2248,11 +2276,15 @@ if cfg['modo_taller'] == 1:
                         host_app = encabezados_app.get("X-Forwarded-Host") or encabezados_app.get("Host") or "datacontroljd.streamlit.app"
                         host_app = str(host_app).split(",")[0].strip()
                         url_seguimiento_nueva = f"https://{host_app}/?seguimiento={quote(token_seguimiento_nuevo)}"
+                        if str(ot_cedula or "").strip():
+                            acceso_seguimiento = "los últimos 4 dígitos de su cédula"
+                        else:
+                            acceso_seguimiento = "su nombre completo o los últimos 4 dígitos del teléfono registrado"
                         mensaje_nueva_orden = (
                             f"Apreciado(a) {ot_cliente}, se ha generado una orden de servicio "
                             f"para su equipo {ot_equipo}. Su número de orden es #{nueva_id:04d}.\n\n"
                             f"Consulta el estado de tu equipo aquí:\n{url_seguimiento_nueva}\n\n"
-                            f"Para ingresar, usa el número de orden {nueva_id:04d} y los últimos 4 dígitos de tu cédula.\n\n"
+                            f"Para ingresar, usa el número de orden {nueva_id:04d} y {acceso_seguimiento}.\n\n"
                             "El estado se actualizará mientras el equipo permanezca en reparación. Gracias por confiar en nosotros."
                         )
                         st.session_state.whatsapp_nueva_orden = (
