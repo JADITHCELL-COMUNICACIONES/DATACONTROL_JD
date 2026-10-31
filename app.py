@@ -2509,6 +2509,8 @@ if cfg['modo_taller'] == 1:
                 if not st.session_state.get(f"mostrar_evidencias_{oid}", False):
                     if st.button("📷 Ver evidencias del equipo", key=f"ver_evidencias_{oid}", use_container_width=True):
                         st.session_state[f"mostrar_evidencias_{oid}"] = True
+                        # El rerun debe volver a abrir la misma ficha, no regresar a Servicios.
+                        st.session_state.ficha_orden_id = int(oid)
                         st.rerun()
                 else:
                     conn_ev = obtener_conexion()
@@ -2578,6 +2580,7 @@ if cfg['modo_taller'] == 1:
 
                     if st.button("➕ Agregar más evidencias", key=f"agregar_evidencias_{oid}", use_container_width=True):
                         st.session_state[f"mostrar_cargador_evidencias_{oid}"] = True
+                        st.session_state.ficha_orden_id = int(oid)
                         st.rerun()
 
                     if st.session_state.get(f"mostrar_cargador_evidencias_{oid}", False):
@@ -2624,6 +2627,8 @@ if cfg['modo_taller'] == 1:
                                         evidencias_guardadas += 1
                                     conn_add_ev.close()
                                     st.session_state[f"mostrar_cargador_evidencias_{oid}"] = False
+                                    # Conservar la ficha abierta después de guardar y refrescar.
+                                    st.session_state.ficha_orden_id = int(oid)
                                     st.success(f"{evidencias_guardadas} evidencia(s) agregada(s) correctamente.")
                                     st.rerun()
                                 except Exception as error_evidencias:
