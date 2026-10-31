@@ -277,9 +277,52 @@ def normalizar_nombre_consulta(valor):
     return " ".join(texto.upper().split())
 
 
+def resolver_clave_puntos(conn, cedula, cliente, telefono):
+    """Unifica registros previos por nombre/teléfono cuando aparece una cédula."""
+    clave_solicitada = clave_cliente_puntos(cedula, cliente)
+    if not clave_solicitada:
+        return ""
+    cursor = conn.cursor()
+    cursor.execute("SELECT cedula, cliente, telefono, puntos_disponibles FROM clientes_puntos")
+    filas = cursor.fetchall()
+    clave_ya_existe = any(str(f[0]) == clave_solicitada for f in filas)
+
+    nombre = normalizar_nombre_consulta(cliente)
+    if clave_solicitada.startswith("NOMBRE:"):
+        telefono4_solicitado = re.sub(r"\D", "", str(telefono or ""))[-4:]
+        for clave_existente, nombre_existente, telefono_existente, _ in filas:
+            if not str(clave_existente).startswith("NOMBRE:") and normalizar_nombre_consulta(nombre_existente) == nombre:
+                t4_existente = re.sub(r"\D", "", str(telefono_existente or ""))[-4:]
+                if not telefono4_solicitado or not t4_existente or telefono4_solicitado == t4_existente:
+                    return str(clave_existente)
+
+    telefono4 = re.sub(r"\D", "", str(telefono or ""))[-4:]
+    for clave_existente, nombre_existente, telefono_existente, _ in filas:
+        if str(clave_existente) == clave_solicitada:
+            return clave_solicitada
+        coincide_nombre = nombre and normalizar_nombre_consulta(nombre_existente) == nombre
+        telefono_existente4 = re.sub(r"\D", "", str(telefono_existente or ""))[-4:]
+        coincide_telefono = bool(telefono4) and telefono4 == telefono_existente4
+        es_nombre = str(clave_existente).startswith("NOMBRE:")
+        if es_nombre and coincide_nombre and (not telefono4 or not telefono_existente4 or coincide_telefono):
+            cursor.execute("SELECT puntos_disponibles FROM clientes_puntos WHERE cedula = ?", (clave_existente,))
+            saldo_antiguo = int((cursor.fetchone() or [0])[0] or 0)
+            cursor.execute("UPDATE movimientos_puntos SET cedula = ? WHERE cedula = ?", (clave_solicitada, clave_existente))
+            cursor.execute(
+                "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT(cedula) DO UPDATE SET "
+                "puntos_disponibles=clientes_puntos.puntos_disponibles + excluded.puntos_disponibles, "
+                "cliente=excluded.cliente, telefono=excluded.telefono, actualizado=excluded.actualizado",
+                (clave_solicitada, str(cliente or "").strip(), str(telefono or "").strip(), saldo_antiguo, obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            cursor.execute("DELETE FROM clientes_puntos WHERE cedula = ?", (clave_existente,))
+            return clave_solicitada
+    return clave_solicitada
+
+
 def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimiento, referencia, detalle):
-    """Registra una bonificación una sola vez y actualiza el saldo del cliente."""
-    cedula_limpia = clave_cliente_puntos(cedula, cliente)
+    """Registra puntos y reutiliza el registro unificado del cliente."""
+    cedula_limpia = resolver_clave_puntos(conn, cedula, cliente, telefono)
     if not cedula_limpia:
         return 0
     puntos = calcular_puntos(valor_pagado)
@@ -1433,48 +1476,88 @@ with tabs[1]:
 with tabs[2]:
     st.markdown('<div class="jd-card">', unsafe_allow_html=True)
     st.subheader("⭐ Puntos de Clientes")
-    st.caption("3 puntos por cada $10.000 efectivamente pagados en ventas y abonos de reparaciones.")
+    st.caption("2 puntos por cada $10.000 efectivamente pagados en ventas y abonos de reparaciones.")
     st.info("Cada punto equivale a $100 de bonificación. Por ejemplo: 100 puntos = $10.000.")
-    cedula_puntos_busqueda = st.text_input(
+    busqueda_puntos = st.text_input(
         "Buscar cliente por cédula o nombre",
         placeholder="Escribe la cédula o el nombre...",
         key="buscar_cedula_puntos",
-    )
+    ).strip()
     conn_puntos_ui = obtener_conexion()
     cur_puntos_ui = conn_puntos_ui.cursor()
-    if cedula_puntos_busqueda.strip():
-        cedula_ui = cedula_puntos_busqueda.strip()
-        cur_puntos_ui.execute(
-            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos WHERE cedula LIKE ? OR cliente LIKE ?",
-            (f"%{cedula_ui}%", f"%{cedula_ui}%"),
-        )
-        clientes_puntos_ui = cur_puntos_ui.fetchall()
-    else:
-        cur_puntos_ui.execute(
-            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos ORDER BY puntos_disponibles DESC, cliente ASC LIMIT 100"
-        )
-        clientes_puntos_ui = cur_puntos_ui.fetchall()
+    cur_puntos_ui.execute(
+        "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos ORDER BY puntos_disponibles DESC, cliente ASC"
+    )
+    filas_puntos = cur_puntos_ui.fetchall()
     conn_puntos_ui.close()
-    if not clientes_puntos_ui:
-        st.info("Todavía no hay clientes con puntos acumulados. Los puntos aparecerán después de registrar una venta o un abono con cédula o nombre.")
+
+    # Agrupa registros antiguos por nombre y teléfono, conservando una sola tarjeta
+    # aunque antes se hubieran guardado con cédula y luego por nombre.
+    grupos_puntos = []
+    for fila in filas_puntos:
+        clave_fila, nombre_fila, telefono_fila, puntos_fila, actualizado_fila = fila
+        nombre_norm = normalizar_nombre_consulta(nombre_fila)
+        telefono4 = re.sub(r"\D", "", str(telefono_fila or ""))[-4:]
+        grupo_encontrado = None
+        for grupo in grupos_puntos:
+            mismo_identificador = str(clave_fila) == str(grupo["cedula"])
+            mismo_nombre_telefono = (
+                nombre_norm and nombre_norm == grupo["nombre_norm"] and
+                telefono4 and telefono4 == grupo["telefono4"]
+            )
+            if mismo_identificador or mismo_nombre_telefono:
+                grupo_encontrado = grupo
+                break
+        if grupo_encontrado is None:
+            grupos_puntos.append({
+                "cedula": str(clave_fila),
+                "nombre": nombre_fila or "Cliente sin nombre",
+                "nombre_norm": nombre_norm,
+                "telefono": telefono_fila or "N/A",
+                "telefono4": telefono4,
+                "puntos": int(puntos_fila or 0),
+                "actualizado": actualizado_fila,
+                "claves": [str(clave_fila)],
+            })
+        else:
+            grupo_encontrado["puntos"] += int(puntos_fila or 0)
+            grupo_encontrado["claves"].append(str(clave_fila))
+            if str(clave_fila) and not str(clave_fila).startswith("NOMBRE:"):
+                grupo_encontrado["cedula"] = str(clave_fila)
+            if (not grupo_encontrado["telefono"] or grupo_encontrado["telefono"] == "N/A") and telefono_fila:
+                grupo_encontrado["telefono"] = telefono_fila
+
+    if busqueda_puntos:
+        termino = normalizar_nombre_consulta(busqueda_puntos)
+        digitos_termino = re.sub(r"\D", "", busqueda_puntos)
+        grupos_puntos = [
+            grupo for grupo in grupos_puntos
+            if termino in normalizar_nombre_consulta(grupo["nombre"])
+            or digitos_termino in re.sub(r"\D", "", str(grupo["cedula"]))
+            or digitos_termino in re.sub(r"\D", "", str(grupo["telefono"]))
+        ]
+
+    if not grupos_puntos:
+        st.info("Todavía no hay clientes con puntos acumulados.")
     else:
-        for cedula_ui, cliente_ui, telefono_ui, puntos_ui, actualizado_ui in clientes_puntos_ui:
-            valor_ui = float(puntos_ui or 0) * VALOR_POR_PUNTO
+        for indice_grupo, grupo in enumerate(grupos_puntos):
+            valor_ui = float(grupo["puntos"] or 0) * VALOR_POR_PUNTO
             p_col1, p_col2, p_col3 = st.columns([2, 1, 1])
             with p_col1:
-                st.markdown(f"**{cliente_ui or 'Cliente sin nombre'}**  ")
-                identificador_ui = "Sin cédula (por nombre)" if str(cedula_ui).startswith("NOMBRE:") else f"Cédula: {cedula_ui}"
-                st.caption(f"{identificador_ui} · Tel: {telefono_ui or 'N/A'}")
+                st.markdown(f"**{grupo['nombre']}**  ")
+                identificador_ui = "Sin cédula (unificado por nombre)" if str(grupo["cedula"]).startswith("NOMBRE:") else f"Cédula: {grupo['cedula']}"
+                st.caption(f"{identificador_ui} · Tel: {grupo['telefono']}")
             with p_col2:
-                st.metric("Puntos", int(puntos_ui or 0))
+                st.metric("Puntos", int(grupo["puntos"]))
             with p_col3:
                 st.metric("Valor", f"${valor_ui:,.0f}")
-            if st.button("Ver movimientos", key=f"ver_movimientos_puntos_{cedula_ui}"):
+            if st.button("Ver movimientos", key=f"ver_movimientos_puntos_unificado_{indice_grupo}"):
                 conn_mov_ui = obtener_conexion()
                 cur_mov_ui = conn_mov_ui.cursor()
+                marcadores = ",".join("?" for _ in grupo["claves"])
                 cur_mov_ui.execute(
-                    "SELECT fecha, tipo_movimiento, puntos, valor_pagado, detalle FROM movimientos_puntos WHERE cedula = ? ORDER BY id DESC",
-                    (cedula_ui,),
+                    f"SELECT fecha, tipo_movimiento, puntos, valor_pagado, detalle FROM movimientos_puntos WHERE cedula IN ({marcadores}) ORDER BY id DESC",
+                    tuple(grupo["claves"]),
                 )
                 movimientos_ui = cur_mov_ui.fetchall()
                 conn_mov_ui.close()
@@ -1484,6 +1567,8 @@ with tabs[2]:
                         use_container_width=True,
                         hide_index=True,
                     )
+                else:
+                    st.info("Este cliente todavía no tiene movimientos registrados.")
             st.markdown("---")
     st.markdown('</div>', unsafe_allow_html=True)
 
