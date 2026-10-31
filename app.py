@@ -243,6 +243,50 @@ def consultar_dataframe(conn, query, params=None):
     return pd.DataFrame(filas, columns=columnas)
 
 
+# --- PROGRAMA DE FIDELIZACIÓN ---
+PUNTOS_POR_BLOQUE = 3          # 3 puntos por cada $10.000 pagados
+VALOR_BLOQUE_PUNTOS = 10000.0
+VALOR_POR_PUNTO = 100.0        # 100 puntos = $10.000 de descuento
+
+
+def calcular_puntos(valor_pagado):
+    """Calcula puntos proporcionalmente sobre el valor efectivamente pagado."""
+    try:
+        valor = max(float(valor_pagado or 0), 0.0)
+        return max(int(round((valor / VALOR_BLOQUE_PUNTOS) * PUNTOS_POR_BLOQUE)), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def registrar_puntos(conn, cedula, cliente, telefono, valor_pagado, tipo_movimiento, referencia, detalle):
+    """Registra una bonificación una sola vez y actualiza el saldo del cliente."""
+    cedula_limpia = str(cedula or "").strip()
+    if not cedula_limpia or cedula_limpia.upper() in {"N/A", "NA", "CONSUMIDOR FINAL"}:
+        return 0
+    puntos = calcular_puntos(valor_pagado)
+    if puntos <= 0:
+        return 0
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM movimientos_puntos WHERE cedula = ? AND tipo_movimiento = ? AND referencia = ?",
+        (cedula_limpia, tipo_movimiento, str(referencia)),
+    )
+    if cursor.fetchone():
+        return 0
+    fecha_puntos = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(
+        "INSERT INTO clientes_puntos (cedula, cliente, telefono, puntos_disponibles, actualizado) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(cedula) DO UPDATE SET cliente=excluded.cliente, telefono=excluded.telefono, "
+        "puntos_disponibles=clientes_puntos.puntos_disponibles + excluded.puntos_disponibles, actualizado=excluded.actualizado",
+        (cedula_limpia, str(cliente or "").strip(), str(telefono or "").strip(), puntos, fecha_puntos),
+    )
+    cursor.execute(
+        "INSERT INTO movimientos_puntos (cedula, cliente, puntos, tipo_movimiento, referencia, valor_pagado, detalle, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (cedula_limpia, str(cliente or "").strip(), puntos, tipo_movimiento, str(referencia), float(valor_pagado or 0), detalle, fecha_puntos),
+    )
+    return puntos
+
+
 @st.fragment(run_every="10s")
 def mostrar_seguimiento_publico(token):
     """Vista pública: solo permite consultar una orden con token + orden + últimos 4 de cédula."""
@@ -621,6 +665,25 @@ def inicializar_bd():
                         notas TEXT,
                         fecha TEXT)''')
 
+    cursor.execute('''CREATE TABLE IF NOT EXISTS clientes_puntos (
+                        cedula TEXT PRIMARY KEY,
+                        cliente TEXT,
+                        telefono TEXT,
+                        puntos_disponibles INTEGER DEFAULT 0,
+                        actualizado TEXT)''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS movimientos_puntos (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        cedula TEXT NOT NULL,
+                        cliente TEXT,
+                        puntos INTEGER NOT NULL,
+                        tipo_movimiento TEXT NOT NULL,
+                        referencia TEXT NOT NULL,
+                        valor_pagado REAL DEFAULT 0,
+                        detalle TEXT,
+                        fecha TEXT,
+                        UNIQUE(cedula, tipo_movimiento, referencia))''')
+
     cursor.execute('''CREATE TABLE IF NOT EXISTS configuracion (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         nombre_empresa TEXT,
@@ -734,7 +797,7 @@ with enc_col2:
     ):
         st.rerun(scope="app")
 
-tabs_labels = ["🛒 Módulo de Ventas", "📊 Historial de Ventas", "📦 Inventario"]
+tabs_labels = ["🛒 Módulo de Ventas", "📊 Historial de Ventas", "⭐ Puntos", "📦 Inventario"]
 if cfg['modo_taller'] == 1:
     tabs_labels.append("➕ Crear Orden")
     tabs_labels.append("🛠️ Servicios")
@@ -955,6 +1018,20 @@ with tabs[0]:
                                 max((v_recibido if v_recibido > 0 else subtotal_calc) - subtotal_calc, 0.0),
                             ),
                         )
+                    valor_pagado_puntos = min(
+                        v_recibido if v_recibido > 0 else subtotal_calc,
+                        subtotal_calc,
+                    )
+                    registrar_puntos(
+                        conn,
+                        cedula_venta,
+                        cliente_venta,
+                        telefono_venta,
+                        valor_pagado_puntos,
+                        "VENTA",
+                        venta_ref,
+                        f"Compra de {len(st.session_state.carrito)} artículo(s)",
+                    )
                     conn.commit()
                     conn.close()
 
@@ -1292,9 +1369,68 @@ with tabs[1]:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# 📦 PESTAÑA: INVENTARIO
+# ⭐ PESTAÑA: PUNTOS DE CLIENTES
 # =========================================================
 with tabs[2]:
+    st.markdown('<div class="jd-card">', unsafe_allow_html=True)
+    st.subheader("⭐ Puntos de Clientes")
+    st.caption("3 puntos por cada $10.000 efectivamente pagados en ventas y abonos de reparaciones.")
+    st.info("Cada punto equivale a $100 de bonificación. Por ejemplo: 100 puntos = $10.000.")
+    cedula_puntos_busqueda = st.text_input(
+        "Buscar cliente por cédula",
+        placeholder="Escribe la cédula del cliente...",
+        key="buscar_cedula_puntos",
+    )
+    conn_puntos_ui = obtener_conexion()
+    cur_puntos_ui = conn_puntos_ui.cursor()
+    if cedula_puntos_busqueda.strip():
+        cedula_ui = cedula_puntos_busqueda.strip()
+        cur_puntos_ui.execute(
+            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos WHERE cedula LIKE ?",
+            (f"%{cedula_ui}%",),
+        )
+        clientes_puntos_ui = cur_puntos_ui.fetchall()
+    else:
+        cur_puntos_ui.execute(
+            "SELECT cedula, cliente, telefono, puntos_disponibles, actualizado FROM clientes_puntos ORDER BY puntos_disponibles DESC, cliente ASC LIMIT 100"
+        )
+        clientes_puntos_ui = cur_puntos_ui.fetchall()
+    conn_puntos_ui.close()
+    if not clientes_puntos_ui:
+        st.info("Todavía no hay clientes con puntos acumulados. Los puntos aparecerán después de registrar una venta o un abono con cédula.")
+    else:
+        for cedula_ui, cliente_ui, telefono_ui, puntos_ui, actualizado_ui in clientes_puntos_ui:
+            valor_ui = float(puntos_ui or 0) * VALOR_POR_PUNTO
+            p_col1, p_col2, p_col3 = st.columns([2, 1, 1])
+            with p_col1:
+                st.markdown(f"**{cliente_ui or 'Cliente sin nombre'}**  ")
+                st.caption(f"Cédula: {cedula_ui} · Tel: {telefono_ui or 'N/A'}")
+            with p_col2:
+                st.metric("Puntos", int(puntos_ui or 0))
+            with p_col3:
+                st.metric("Valor", f"${valor_ui:,.0f}")
+            if st.button("Ver movimientos", key=f"ver_movimientos_puntos_{cedula_ui}"):
+                conn_mov_ui = obtener_conexion()
+                cur_mov_ui = conn_mov_ui.cursor()
+                cur_mov_ui.execute(
+                    "SELECT fecha, tipo_movimiento, puntos, valor_pagado, detalle FROM movimientos_puntos WHERE cedula = ? ORDER BY id DESC",
+                    (cedula_ui,),
+                )
+                movimientos_ui = cur_mov_ui.fetchall()
+                conn_mov_ui.close()
+                if movimientos_ui:
+                    st.dataframe(
+                        pd.DataFrame(movimientos_ui, columns=["Fecha", "Tipo", "Puntos", "Valor pagado", "Detalle"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            st.markdown("---")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================================================
+# 📦 PESTAÑA: INVENTARIO
+# =========================================================
+with tabs[3]:
     st.markdown('<div class="jd-card">', unsafe_allow_html=True)
     st.markdown("##### 🔍 BUSCAR PRODUCTO")
     inv_busqueda = st.text_input("Nombre o código...", placeholder="Nombre o código...", label_visibility="collapsed", key="inv_busq_input")
@@ -1721,7 +1857,7 @@ with tabs[2]:
 # ➕ PESTAÑA: CREAR ORDEN DE SERVICIO (AUTORRELLENO BLINDADO CON STATE)
 # =========================================================
 if cfg['modo_taller'] == 1:
-    with tabs[3]:
+    with tabs[4]:
         if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
             col_tlg1, col_tlg2, col_tlg3 = st.columns([2, 1, 2])
             with col_tlg2:
@@ -2048,6 +2184,17 @@ if cfg['modo_taller'] == 1:
                                 ),
                             )
 
+                    registrar_puntos(
+                        conn,
+                        ot_cedula,
+                        ot_cliente,
+                        ot_tel,
+                        val_abono,
+                        "ORDEN_ABONO",
+                        f"{nueva_id}-INICIAL",
+                        f"Abono inicial de la Orden #{nueva_id:04d}",
+                    )
+
                     for foto in fotos_ingreso or []:
                         contenido_foto = foto.getvalue()
                         if contenido_foto:
@@ -2309,7 +2456,7 @@ if cfg['modo_taller'] == 1:
 # 🛠️ PESTAÑA: SERVICIOS (GESTIÓN Y BANCO DE REPARACIÓN)
 # =========================================================
 if cfg['modo_taller'] == 1:
-    with tabs[4]:
+    with tabs[5]:
         if cfg['logo_path'] and os.path.exists(cfg['logo_path']):
             col_tlg1, col_tlg2, col_tlg3 = st.columns([2, 1, 2])
             with col_tlg2:
@@ -2875,6 +3022,15 @@ if cfg['modo_taller'] == 1:
                             conn = obtener_conexion()
                             cursor = conn.cursor()
                             total_final_abono = c_abo + nuevo_abono_suma
+                            puntos_liquidacion_entrega = 0.0
+                            if nuevo_estado_edit == "ENTREGADO":
+                                # Al entregar el equipo se considera cancelado el saldo
+                                # restante, aunque no se registre como abono manual.
+                                puntos_liquidacion_entrega = max(
+                                    float(nuevo_costo_edit) - c_abo - nuevo_abono_suma,
+                                    0.0,
+                                )
+                                total_final_abono = max(float(nuevo_costo_edit), total_final_abono)
                             falla_final = nueva_falla_edit.strip()
                             if nueva_novedad_edit.strip():
                                 fecha_novedad = obtener_tiempo_colombia().strftime("%Y-%m-%d %H:%M")
@@ -2895,6 +3051,29 @@ if cfg['modo_taller'] == 1:
                                     oid,
                                 ),
                             )
+                            if nuevo_estado_edit == "ENTREGADO" and puntos_liquidacion_entrega > 0:
+                                registrar_puntos(
+                                    conn,
+                                    ord_data[2],
+                                    ord_data[1],
+                                    nuevo_telefono_edit,
+                                    puntos_liquidacion_entrega,
+                                    "ORDEN_LIQUIDACION",
+                                    f"{oid}-LIQUIDACION",
+                                    f"Saldo liquidado al entregar la Orden #{oid:04d}",
+                                )
+                            if nuevo_abono_suma > 0:
+                                referencia_abono = f"{oid}-ABONO-{obtener_tiempo_colombia().strftime('%Y%m%d%H%M%S%f')}"
+                                registrar_puntos(
+                                    conn,
+                                    ord_data[2],
+                                    ord_data[1],
+                                    nuevo_telefono_edit,
+                                    nuevo_abono_suma,
+                                    "ORDEN_ABONO",
+                                    referencia_abono,
+                                    f"Abono adicional de la Orden #{oid:04d}",
+                                )
                             conn.commit()
                             conn.close()
                             # Preparar automáticamente el mensaje según el estado.
