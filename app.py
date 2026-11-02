@@ -847,6 +847,59 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def preparar_enlace_seguimiento(orden_id):
+    """Obtiene o crea el token de seguimiento y devuelve la URL pública."""
+    conn = obtener_conexion()
+    cur = conn.cursor()
+    cur.execute("SELECT seguimiento_token FROM ordenes_servicio WHERE id = ?", (int(orden_id),))
+    fila = cur.fetchone()
+    token = str(fila[0] or "").strip() if fila else ""
+    if not token:
+        token = secrets.token_urlsafe(24)
+        cur.execute("UPDATE ordenes_servicio SET seguimiento_token = ? WHERE id = ?", (token, int(orden_id)))
+        conn.commit()
+    conn.close()
+    try:
+        encabezados = dict(st.context.headers)
+    except Exception:
+        encabezados = {}
+    host = encabezados.get("X-Forwarded-Host") or encabezados.get("Host") or "datacontroljd.streamlit.app"
+    host = str(host).split(",")[0].strip()
+    esquema = "https"
+    return f"{esquema}://{host}/?seguimiento={quote(token)}"
+
+
+def enlace_reenvio_seguimiento(orden_id):
+    """Construye un enlace visible para volver a enviar el seguimiento por WhatsApp."""
+    conn = obtener_conexion()
+    cur = conn.cursor()
+    cur.execute("SELECT cliente, telefono, equipo, cedula, estado FROM ordenes_servicio WHERE id = ?", (int(orden_id),))
+    fila = cur.fetchone()
+    conn.close()
+    if not fila:
+        return "<span style='color:#94a3b8;font-size:11px;'>Orden no disponible</span>"
+    cliente, telefono, equipo, cedula, estado = fila
+    if str(estado or "").strip().upper() == "ENTREGADO":
+        return "<span style='color:#94a3b8;font-size:11px;'>Seguimiento cerrado</span>"
+    numero = re.sub(r"\D", "", str(telefono or ""))
+    if not numero:
+        return "<span style='color:#f6c85f;font-size:11px;'>Sin teléfono</span>"
+    url_seguimiento = preparar_enlace_seguimiento(orden_id)
+    acceso = "los últimos 4 dígitos de su cédula" if str(cedula or "").strip() else "su nombre completo o los últimos 4 dígitos del teléfono registrado"
+    mensaje = (
+        f"Apreciado(a) {cliente or 'cliente'}, aquí puede consultar el estado de su equipo "
+        f"{equipo or ''}:\n\n{url_seguimiento}\n\n"
+        f"Número de orden: {int(orden_id):04d}\n"
+        f"Para ingresar, use {acceso}.\n\nGracias por confiar en nosotros."
+    )
+    url_whatsapp = f"https://api.whatsapp.com/send?phone=57{numero}&text={quote(mensaje)}"
+    return (
+        f"<a href='{escape(url_whatsapp, quote=True)}' target='_blank' rel='noopener' "
+        "style='background:#25d366;color:#062b1b;padding:7px 9px;border-radius:7px;"
+        "text-decoration:none;font-weight:800;font-size:10px;display:inline-block;white-space:nowrap;'>"
+        "💬 Reenviar seguimiento</a>"
+    )
+
 # --- ENLACE PÚBLICO DE SEGUIMIENTO ---
 try:
     token_seguimiento_publico = str(st.query_params.get("seguimiento", "") or "").strip()
@@ -2986,7 +3039,7 @@ if cfg['modo_taller'] == 1:
                 # vuelva a pulsar la pestaña del estado para que aparezca la orden.
                 st.markdown("#### 🔎 Resultado de la búsqueda")
                 for _, resultado in df_ordenes_tabla.iterrows():
-                    res_col1, res_col2, res_col3, res_col4, res_col5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
+                    res_col1, res_col2, res_col3, res_col4, res_col5, res_col6 = st.columns([0.7, 2.2, 2.1, 1.7, 1.0, 1.7])
                     with res_col1:
                         st.markdown(f"**#{int(resultado['ID']):04d}**")
                     with res_col2:
@@ -2996,9 +3049,11 @@ if cfg['modo_taller'] == 1:
                     with res_col4:
                         st.markdown(f"🟢 `{resultado['Estado']}`")
                     with res_col5:
-                        if st.button("🛠️ Ver Ficha", key=f"btn_busqueda_directa_{int(resultado['ID'])}"):
+                        if st.button("🛠️ Ficha", key=f"btn_busqueda_directa_{int(resultado['ID'])}"):
                             st.session_state.ficha_orden_id = int(resultado['ID'])
                             st.rerun()
+                    with res_col6:
+                        st.markdown(enlace_reenvio_seguimiento(int(resultado['ID'])), unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
 
             tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
@@ -3009,15 +3064,17 @@ if cfg['modo_taller'] == 1:
                     return
                 with st.container(height=320):
                     for _, row in df_sub.iterrows():
-                        col_row1, col_row2, col_row3, col_row4, col_row5 = st.columns([0.8, 2.5, 2.5, 1.8, 1.2])
+                        col_row1, col_row2, col_row3, col_row4, col_row5, col_row6 = st.columns([0.7, 2.2, 2.1, 1.7, 1.0, 1.7])
                         with col_row1: st.markdown(f"**#{row['ID']:04d}**")
                         with col_row2: st.markdown(f"{row['Cliente']}")
                         with col_row3: st.markdown(f"{row['Equipo']}")
                         with col_row4: st.markdown(f"🟢 `{row['Estado']}`")
                         with col_row5:
-                            if st.button("🛠️ Ver Ficha", key=f"btn_{sufijo}_{row['ID']}"):
+                            if st.button("🛠️ Ficha", key=f"btn_{sufijo}_{row['ID']}"):
                                 st.session_state.ficha_orden_id = row['ID']
                                 st.rerun()
+                        with col_row6:
+                            st.markdown(enlace_reenvio_seguimiento(int(row['ID'])), unsafe_allow_html=True)
                         st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
 
             with tab_proceso:
