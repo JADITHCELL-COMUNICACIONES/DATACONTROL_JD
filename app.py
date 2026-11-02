@@ -576,7 +576,7 @@ def mostrar_seguimiento_publico(token):
     """, unsafe_allow_html=True)
     st.markdown('<div class="tracking-shell">', unsafe_allow_html=True)
     st.markdown(f'<div class="tracking-hero"><div class="tracking-brand">{logo_publico_html}<div><div style="font-size:18px;font-weight:800;">Seguimiento de servicio técnico</div></div></div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="tracking-card"><h2 style="margin-top:0">Consulta tu reparación</h2><p>Ingresa los datos que aparecen en el mensaje de WhatsApp.</p>', unsafe_allow_html=True)
+    st.markdown('<div class="tracking-card"><h2 style="margin-top:0">Consulta tu reparación</h2><p>Ingresa el número de orden y el dato de validación indicado en el mensaje de WhatsApp. Si registraste cédula, usa sus últimos 4 dígitos. Si no registraste cédula, usa tu nombre completo o los últimos 4 dígitos del teléfono.</p>', unsafe_allow_html=True)
     with st.form("form_consulta_seguimiento"):
         numero_consulta = st.text_input("Número de orden", placeholder="Ejemplo: 0120 o 120")
         metodo_consulta = st.radio(
@@ -588,9 +588,18 @@ def mostrar_seguimiento_publico(token):
         if metodo_consulta == "Cédula":
             dato_consulta = st.text_input("Últimos 4 dígitos de la cédula", max_chars=4, placeholder="Ejemplo: 2858")
         elif metodo_consulta == "Nombre completo":
-            dato_consulta = st.text_input("Nombre completo del cliente", placeholder="Ejemplo: José Martínez")
+            dato_consulta = st.text_input(
+                "Nombre completo del cliente",
+                placeholder="Ejemplo: José Martínez",
+                help="Escribe el nombre completo tal como fue registrado. No se aceptan solo nombres o apellidos parciales.",
+            )
         else:
-            dato_consulta = st.text_input("Últimos 4 dígitos del teléfono", max_chars=4, placeholder="Ejemplo: 5590")
+            dato_consulta = st.text_input(
+                "Últimos 4 dígitos del teléfono",
+                max_chars=4,
+                placeholder="Ejemplo: 5590",
+                help="Escribe exactamente los últimos 4 números del teléfono registrado.",
+            )
         consultar = st.form_submit_button("🔎 Consultar estado", type="primary", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -643,9 +652,22 @@ def mostrar_seguimiento_publico(token):
                     if metodo_consulta == "Cédula":
                         validacion_ok = bool(cedula_guardada) and len(dato_digitos) == 4 and cedula_guardada[-4:] == dato_digitos
                     elif metodo_consulta == "Nombre completo":
-                        validacion_ok = not cedula_guardada and normalizar_nombre_consulta(dato_limpio) == nombre_guardado
+                        # El nombre completo solo es una alternativa cuando no se registró cédula.
+                        # Se normalizan tildes, mayúsculas y espacios, pero se exige coincidencia completa.
+                        nombre_consultado = normalizar_nombre_consulta(dato_limpio)
+                        validacion_ok = (
+                            not cedula_guardada
+                            and bool(nombre_consultado)
+                            and nombre_consultado == nombre_guardado
+                        )
                     else:
-                        validacion_ok = not cedula_guardada and len(dato_digitos) == 4 and telefono_guardado[-4:] == dato_digitos
+                        # El teléfono solo es una alternativa cuando no se registró cédula.
+                        validacion_ok = (
+                            not cedula_guardada
+                            and len(dato_digitos) == 4
+                            and bool(telefono_guardado)
+                            and telefono_guardado[-4:] == dato_digitos
+                        )
                     if validacion_ok:
                         resultado = fila_publica
                         st.session_state.seguimiento_resultado = fila_publica
