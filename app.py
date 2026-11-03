@@ -869,44 +869,47 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def preparar_enlace_seguimiento(orden_id):
-    """Obtiene o crea el token de seguimiento y devuelve la URL pública."""
-    conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute("SELECT seguimiento_token FROM ordenes_servicio WHERE id = ?", (int(orden_id),))
-    fila = cur.fetchone()
-    token = str(fila[0] or "").strip() if fila else ""
+def asegurar_tokens_seguimiento(df_ordenes):
+    """Completa tokens faltantes en lote y actualiza el DataFrame."""
+    if df_ordenes is None or df_ordenes.empty or "SeguimientoToken" not in df_ordenes.columns:
+        return df_ordenes
+    faltantes = []
+    for _, fila in df_ordenes.iterrows():
+        token = str(fila.get("SeguimientoToken") or "").strip()
+        if not token:
+            faltantes.append((int(fila["ID"]), secrets.token_urlsafe(24)))
+    if faltantes:
+        conn_tokens = obtener_conexion()
+        cur_tokens = conn_tokens.cursor()
+        for orden_id, token in faltantes:
+            cur_tokens.execute(
+                "UPDATE ordenes_servicio SET seguimiento_token = ? WHERE id = ? AND (seguimiento_token IS NULL OR seguimiento_token = '')",
+                (token, orden_id),
+            )
+        conn_tokens.commit()
+        conn_tokens.close()
+        for orden_id, token in faltantes:
+            df_ordenes.loc[df_ordenes["ID"] == orden_id, "SeguimientoToken"] = token
+    return df_ordenes
+
+
+def construir_enlace_reenvio_seguimiento(orden_id, cliente, telefono, equipo, cedula, estado, token):
+    """Construye WhatsApp usando los datos ya cargados, sin consultar Turso por cada fila."""
+    if str(estado or "").strip().upper() == "ENTREGADO":
+        return "<span style='color:#94a3b8;font-size:11px;'>Seguimiento cerrado</span>"
+    numero = re.sub(r"\D", "", str(telefono or ""))
+    if not numero:
+        return "<span style='color:#f6c85f;font-size:11px;'>Sin teléfono</span>"
+    token = str(token or "").strip()
     if not token:
-        token = secrets.token_urlsafe(24)
-        cur.execute("UPDATE ordenes_servicio SET seguimiento_token = ? WHERE id = ?", (token, int(orden_id)))
-        conn.commit()
-    conn.close()
+        return "<span style='color:#f6c85f;font-size:11px;'>Sin enlace</span>"
     try:
         encabezados = dict(st.context.headers)
     except Exception:
         encabezados = {}
     host = encabezados.get("X-Forwarded-Host") or encabezados.get("Host") or "datacontroljd.streamlit.app"
     host = str(host).split(",")[0].strip()
-    esquema = "https"
-    return f"{esquema}://{host}/?seguimiento={quote(token)}"
-
-
-def enlace_reenvio_seguimiento(orden_id):
-    """Construye un enlace visible para volver a enviar el seguimiento por WhatsApp."""
-    conn = obtener_conexion()
-    cur = conn.cursor()
-    cur.execute("SELECT cliente, telefono, equipo, cedula, estado FROM ordenes_servicio WHERE id = ?", (int(orden_id),))
-    fila = cur.fetchone()
-    conn.close()
-    if not fila:
-        return "<span style='color:#94a3b8;font-size:11px;'>Orden no disponible</span>"
-    cliente, telefono, equipo, cedula, estado = fila
-    if str(estado or "").strip().upper() == "ENTREGADO":
-        return "<span style='color:#94a3b8;font-size:11px;'>Seguimiento cerrado</span>"
-    numero = re.sub(r"\D", "", str(telefono or ""))
-    if not numero:
-        return "<span style='color:#f6c85f;font-size:11px;'>Sin teléfono</span>"
-    url_seguimiento = preparar_enlace_seguimiento(orden_id)
+    url_seguimiento = f"https://{host}/?seguimiento={quote(token)}"
     acceso = "los últimos 4 dígitos de su cédula" if str(cedula or "").strip() else "su nombre completo o los últimos 4 dígitos del teléfono registrado"
     mensaje = (
         f"Apreciado(a) {cliente or 'cliente'}, aquí puede consultar el estado de su equipo "
@@ -3025,7 +3028,7 @@ if cfg['modo_taller'] == 1:
                 )
 
             conn = obtener_conexion()
-            query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha FROM ordenes_servicio WHERE 1=1"
+            query_base = "SELECT id as ID, cliente as Cliente, cedula as Cédula, telefono as Tel, equipo as Equipo, estado as Estado, fecha as Fecha, seguimiento_token as SeguimientoToken FROM ordenes_servicio WHERE 1=1"
             params = []
             # Acepta 34, 0034 o #0034 y los convierte al mismo ID de la orden.
             numero_orden_limpio = str(filtro_numero_orden or "").strip().replace("#", "")
@@ -3046,6 +3049,9 @@ if cfg['modo_taller'] == 1:
             query_base += " ORDER BY id DESC"
             df_ordenes_tabla = consultar_dataframe(conn, query_base, params)
             conn.close()
+            # Las órdenes normales no generan consultas adicionales por fila.
+            # Solo las órdenes antiguas sin token se completan una vez y en lote.
+            df_ordenes_tabla = asegurar_tokens_seguimiento(df_ordenes_tabla)
 
             filtros_activos = any((numero_orden_limpio, nombre_busqueda, cedula_busqueda))
             if filtros_activos:
@@ -3075,7 +3081,13 @@ if cfg['modo_taller'] == 1:
                             st.session_state.ficha_orden_id = int(resultado['ID'])
                             st.rerun()
                     with res_col6:
-                        st.markdown(enlace_reenvio_seguimiento(int(resultado['ID'])), unsafe_allow_html=True)
+                        st.markdown(
+                            construir_enlace_reenvio_seguimiento(
+                                int(resultado['ID']), resultado['Cliente'], resultado['Tel'],
+                                resultado['Equipo'], resultado['Cédula'], resultado['Estado'],
+                                resultado['SeguimientoToken']
+                            ), unsafe_allow_html=True
+                        )
                     st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
 
             tab_proceso, tab_reparadas, tab_entregadas, tab_garantias, tab_todas = st.tabs(["⏳ En Proceso", "🔧 Reparadas", "✅ Entregadas", "🛡️ Garantías", "📋 Todas"])
@@ -3096,7 +3108,12 @@ if cfg['modo_taller'] == 1:
                                 st.session_state.ficha_orden_id = row['ID']
                                 st.rerun()
                         with col_row6:
-                            st.markdown(enlace_reenvio_seguimiento(int(row['ID'])), unsafe_allow_html=True)
+                            st.markdown(
+                                construir_enlace_reenvio_seguimiento(
+                                    int(row['ID']), row['Cliente'], row['Tel'], row['Equipo'],
+                                    row['Cédula'], row['Estado'], row['SeguimientoToken']
+                                ), unsafe_allow_html=True
+                            )
                         st.markdown("<hr style='margin: 2px 0 6px 0; border-color: #1f293d;'>", unsafe_allow_html=True)
 
             with tab_proceso:
